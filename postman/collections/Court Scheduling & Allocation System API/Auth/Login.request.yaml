@@ -1,0 +1,23 @@
+$kind: http-request
+name: 'Login'
+method: POST
+url: '{{base_url}}/auth/login'
+headers:
+  - key: 'Content-Type'
+    value: 'application/json'
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@judiciary.go.ke",
+      "password": "AdminPass123!"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      var res = pm.response.json();
+      if (res.token) {
+          pm.collectionVariables.set('token', res.token);
+          console.log('Token saved:', res.token);
+      }

@@ -6,7 +6,7 @@ SELECT
 	(SELECT COUNT(*) FROM hearings WHERE status = 'ongoing') AS ongoing_hearings,
 	(SELECT COUNT(*) FROM hearings WHERE status = 'completed') AS completed_hearings;
 
--- 2) Cases with type and parties
+
 SELECT
 	c.id,
 	c.case_number,
@@ -22,7 +22,7 @@ JOIN users p ON p.id = c.plaintiff_id
 JOIN users d ON d.id = c.defendant_id
 ORDER BY c.created_at DESC;
 
--- 3) Upcoming hearings with judge and court
+
 SELECT
 	h.id,
 	c.case_number,
@@ -40,7 +40,7 @@ JOIN users u ON u.id = j.user_id
 WHERE h.scheduled_start >= NOW()
 ORDER BY h.scheduled_start ASC;
 
--- 4) Documents by case (replace $1 with case id in app code)
+
 SELECT
 	id,
 	case_id,
@@ -54,7 +54,7 @@ FROM documents
 WHERE case_id = $1
 ORDER BY uploaded_at DESC;
 
--- 5) Notifications for a user (replace $1 with user id in app code)
+-- Notifications for a user 
 SELECT
 	id,
 	title,

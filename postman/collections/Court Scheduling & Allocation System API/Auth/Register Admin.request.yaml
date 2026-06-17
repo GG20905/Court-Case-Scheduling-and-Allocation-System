@@ -1,0 +1,16 @@
+$kind: http-request
+name: 'Register Admin'
+method: POST
+url: '{{base_url}}/auth/register'
+headers:
+  - key: 'Content-Type'
+    value: 'application/json'
+body:
+  type: json
+  content: |-
+    {
+      "full_name": "Court Administrator Mwangi",
+      "email": "admin@judiciary.go.ke",
+      "password": "AdminPass123!",
+      "role": "admin"
+    }

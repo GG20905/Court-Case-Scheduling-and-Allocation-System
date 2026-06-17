@@ -1,0 +1,16 @@
+$kind: collection
+name: 'Court Scheduling & Allocation System API'
+description: 'Kenya Judiciary - Court Case Scheduling and Allocation System'
+variables:
+  - key: 'base_url'
+    value: 'http://localhost:5000/api'
+  - key: 'token'
+    value: ''
+  - key: 'case_id'
+    value: '1'
+  - key: 'hearing_id'
+    value: '1'
+  - key: 'ruling_id'
+    value: '1'
+  - key: 'assignment_id'
+    value: '1'

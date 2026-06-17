@@ -1,0 +1,444 @@
+{
+	"info": {
+		"_postman_id": "court-system-api-v1",
+		"name": "Court Scheduling & Allocation System API",
+		"description": "Kenya Judiciary - Court Case Scheduling and Allocation System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:5000/api", "type": "string" },
+		{ "key": "token", "value": "", "type": "string" },
+		{ "key": "case_id", "value": "1", "type": "string" },
+		{ "key": "hearing_id", "value": "1", "type": "string" },
+		{ "key": "ruling_id", "value": "1", "type": "string" },
+		{ "key": "assignment_id", "value": "1", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register Admin",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Court Administrator Mwangi\",\n  \"email\": \"admin@judiciary.go.ke\",\n  \"password\": \"AdminPass123!\",\n  \"role\": \"admin\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Register Judge",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Hon. Justice Mary Odhiambo\",\n  \"email\": \"justice.odhiambo@judiciary.go.ke\",\n  \"password\": \"JudgePass123!\",\n  \"role\": \"judge\",\n  \"court_station\": \"Nairobi High Court\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Register Litigant",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"John Kamau\",\n  \"email\": \"john.kamau@email.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"litigant\",\n  \"participant_type\": \"litigant\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Register Advocate",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Jane Wanjiru\",\n  \"email\": \"jane.advocate@email.com\",\n  \"password\": \"AdvocatePass123!\",\n  \"role\": \"advocate\",\n  \"participant_type\": \"advocate\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var res = pm.response.json();",
+									"if (res.token) {",
+									"    pm.collectionVariables.set('token', res.token);",
+									"    console.log('Token saved:', res.token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@judiciary.go.ke\",\n  \"password\": \"AdminPass123!\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Cases",
+			"item": [
+				{
+					"name": "Submit Case",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var res = pm.response.json();",
+									"if (res.data && res.data.case_id) {",
+									"    pm.collectionVariables.set('case_id', String(res.data.case_id));",
+									"    console.log('Case ID saved:', res.data.case_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/cases", "host": ["{{base_url}}"], "path": ["cases"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"case_title\": \"Kamau vs. ABC Contractors Ltd\",\n  \"case_category\": \"Civil\",\n  \"case_description\": \"Dispute over breach of construction contract.\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Get All Cases",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/cases", "host": ["{{base_url}}"], "path": ["cases"] }
+					}
+				},
+				{
+					"name": "Get Case By ID",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/cases/{{case_id}}", "host": ["{{base_url}}"], "path": ["cases", "{{case_id}}"] }
+					}
+				},
+				{
+					"name": "Register Case and Set Priority (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/cases/{{case_id}}/register", "host": ["{{base_url}}"], "path": ["cases", "{{case_id}}", "register"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"priority\": \"high\",\n  \"case_status\": \"active\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Update Case (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/cases/{{case_id}}", "host": ["{{base_url}}"], "path": ["cases", "{{case_id}}"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"case_status\": \"active\",\n  \"priority\": \"urgent\"\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Hearings",
+			"item": [
+				{
+					"name": "Request Hearing",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var res = pm.response.json();",
+									"if (res.data && res.data.hearing_id) {",
+									"    pm.collectionVariables.set('hearing_id', String(res.data.hearing_id));",
+									"    console.log('Hearing ID saved:', res.data.hearing_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/hearings/request", "host": ["{{base_url}}"], "path": ["hearings", "request"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"case_id\": {{case_id}},\n  \"preferred_date\": \"2026-08-15\",\n  \"preferred_time\": \"09:00:00\",\n  \"notes\": \"Morning slot preferred due to witness availability.\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Get All Hearings",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/hearings", "host": ["{{base_url}}"], "path": ["hearings"] }
+					}
+				},
+				{
+					"name": "Get Hearing By ID",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/hearings/{{hearing_id}}", "host": ["{{base_url}}"], "path": ["hearings", "{{hearing_id}}"] }
+					}
+				},
+				{
+					"name": "Approve Hearing and Assign Judge (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/hearings/{{hearing_id}}/approve", "host": ["{{base_url}}"], "path": ["hearings", "{{hearing_id}}", "approve"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"judge_id\": 1,\n  \"hearing_date\": \"2026-08-15\",\n  \"hearing_time\": \"09:00:00\",\n  \"meeting_link\": \"https://meet.judiciary.go.ke/courtroom-1\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Judge Approve Assignment",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/hearings/assignments/{{assignment_id}}/respond", "host": ["{{base_url}}"], "path": ["hearings", "assignments", "{{assignment_id}}", "respond"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"approve\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Judge Reject Assignment",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/hearings/assignments/{{assignment_id}}/respond", "host": ["{{base_url}}"], "path": ["hearings", "assignments", "{{assignment_id}}", "respond"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"reject\",\n  \"rejection_reason\": \"Conflict of interest.\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Reassign Judge (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/hearings/{{hearing_id}}/reassign", "host": ["{{base_url}}"], "path": ["hearings", "{{hearing_id}}", "reassign"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"new_judge_id\": 2\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "Upload Document",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/documents", "host": ["{{base_url}}"], "path": ["documents"] },
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "document", "type": "file", "src": [] },
+								{ "key": "case_id", "value": "{{case_id}}", "type": "text" },
+								{ "key": "document_type", "value": "Evidence", "type": "text" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Documents For Case",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/documents/case/{{case_id}}", "host": ["{{base_url}}"], "path": ["documents", "case", "{{case_id}}"] }
+					}
+				},
+				{
+					"name": "Download Document",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/documents/1/download", "host": ["{{base_url}}"], "path": ["documents", "1", "download"] }
+					}
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/documents/1", "host": ["{{base_url}}"], "path": ["documents", "1"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Rulings",
+			"item": [
+				{
+					"name": "Submit Ruling (Judge)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var res = pm.response.json();",
+									"if (res.data && res.data.ruling_id) {",
+									"    pm.collectionVariables.set('ruling_id', String(res.data.ruling_id));",
+									"    console.log('Ruling ID saved:', res.data.ruling_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"url": { "raw": "{{base_url}}/rulings", "host": ["{{base_url}}"], "path": ["rulings"] },
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"case_id\": {{case_id}},\n  \"ruling_text\": \"Having considered all evidence presented, the court finds in favour of the plaintiff. The defendant is ordered to pay Ksh 2,500,000 in damages within 30 days.\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Get All Rulings",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/rulings", "host": ["{{base_url}}"], "path": ["rulings"] }
+					}
+				},
+				{
+					"name": "Get Ruling By Case",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/rulings/case/{{case_id}}", "host": ["{{base_url}}"], "path": ["rulings", "case", "{{case_id}}"] }
+					}
+				},
+				{
+					"name": "Publish Ruling (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/rulings/{{ruling_id}}/publish", "host": ["{{base_url}}"], "path": ["rulings", "{{ruling_id}}", "publish"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get All Judges",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/admin/judges", "host": ["{{base_url}}"], "path": ["admin", "judges"] }
+					}
+				},
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
+					}
+				},
+				{
+					"name": "Admin Dashboard",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+						"url": { "raw": "{{base_url}}/admin/dashboard", "host": ["{{base_url}}"], "path": ["admin", "dashboard"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+					}
+				}
+			]
+		}
+	]
+}
