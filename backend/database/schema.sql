@@ -1,109 +1,176 @@
-BEGIN;
 
-DROP TABLE IF EXISTS notifications CASCADE;
-DROP TABLE IF EXISTS documents CASCADE;
-DROP TABLE IF EXISTS case_participants CASCADE;
-DROP TABLE IF EXISTS hearings CASCADE;
-DROP TABLE IF EXISTS cases CASCADE;
-DROP TABLE IF EXISTS judges CASCADE;
-DROP TABLE IF EXISTS courts CASCADE;
-DROP TABLE IF EXISTS case_types CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-
+-- ============================================================
+-- USERS
+-- ============================================================
 CREATE TABLE users (
-	id SERIAL PRIMARY KEY,
-	full_name VARCHAR(150) NOT NULL,
-	email VARCHAR(120) NOT NULL UNIQUE,
-	password_hash TEXT NOT NULL,
-	role VARCHAR(30) NOT NULL CHECK (role IN ('admin', 'judge', 'lawyer', 'clerk', 'party')),
-	phone VARCHAR(30),
-	created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  user_id    SERIAL PRIMARY KEY,
+  full_name  VARCHAR(150) NOT NULL,
+  email      VARCHAR(150) NOT NULL UNIQUE,
+  password   VARCHAR(255) NOT NULL,
+  role       VARCHAR(50)  NOT NULL CHECK (role IN ('litigant', 'advocate', 'judge', 'admin')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE courts (
-	id SERIAL PRIMARY KEY,
-	name VARCHAR(120) NOT NULL,
-	location VARCHAR(180) NOT NULL,
-	virtual_link TEXT,
-	is_active BOOLEAN NOT NULL DEFAULT TRUE,
-	created_at TIMESTAMP NOT NULL DEFAULT NOW()
+-- ============================================================
+-- COURT ADMINISTRATORS
+-- ============================================================
+CREATE TABLE court_administrators (
+  admin_id   SERIAL PRIMARY KEY,
+  user_id    INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+  full_name  VARCHAR(150) NOT NULL,
+  email      VARCHAR(150) NOT NULL UNIQUE,
+  password   VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE case_types (
-	id SERIAL PRIMARY KEY,
-	name VARCHAR(80) NOT NULL UNIQUE,
-	description TEXT
-);
-
+-- ============================================================
+-- JUDGES
+-- ============================================================
 CREATE TABLE judges (
-	id SERIAL PRIMARY KEY,
-	user_id INT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-	court_id INT NOT NULL REFERENCES courts(id) ON DELETE RESTRICT,
-	assigned_at TIMESTAMP NOT NULL DEFAULT NOW()
+  judge_id      SERIAL PRIMARY KEY,
+  user_id       INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+  full_name     VARCHAR(150) NOT NULL,
+  email         VARCHAR(150) NOT NULL UNIQUE,
+  password      VARCHAR(255) NOT NULL,
+  court_station VARCHAR(100) NOT NULL,
+  created_at    TIMESTAMP DEFAULT NOW()
 );
 
+-- ============================================================
+-- LITIGANTS / ADVOCATES
+-- ============================================================
+CREATE TABLE litigants_advocates (
+  participant_id   SERIAL PRIMARY KEY,
+  user_id          INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+  full_name        VARCHAR(150) NOT NULL,
+  email            VARCHAR(150) NOT NULL UNIQUE,
+  password         VARCHAR(255) NOT NULL,
+  participant_type VARCHAR(50) NOT NULL CHECK (participant_type IN ('litigant', 'advocate')),
+  created_at       TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================================
+-- CASES
+-- ============================================================
 CREATE TABLE cases (
-	id SERIAL PRIMARY KEY,
-	case_number VARCHAR(50) NOT NULL UNIQUE,
-	title VARCHAR(200) NOT NULL,
-	description TEXT,
-	status VARCHAR(30) NOT NULL DEFAULT 'filed' CHECK (status IN ('filed', 'scheduled', 'in_hearing', 'judgment_pending', 'closed', 'dismissed')),
-	case_type_id INT NOT NULL REFERENCES case_types(id) ON DELETE RESTRICT,
-	plaintiff_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-	defendant_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-	filed_by INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-	created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-	updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  case_id          SERIAL PRIMARY KEY,
+  case_title       VARCHAR(200) NOT NULL,
+  case_category    VARCHAR(100) NOT NULL,
+  case_description TEXT,
+  case_status      VARCHAR(50) NOT NULL DEFAULT 'pending'
+                   CHECK (case_status IN ('pending', 'active', 'scheduled', 'closed', 'dismissed')),
+  priority         VARCHAR(20) NOT NULL DEFAULT 'normal'
+                   CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  filing_date      DATE NOT NULL DEFAULT CURRENT_DATE,
+  participant_id   INT REFERENCES litigants_advocates(participant_id) ON DELETE SET NULL,
+  admin_id         INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
+  created_at       TIMESTAMP DEFAULT NOW(),
+  updated_at       TIMESTAMP DEFAULT NOW()
 );
 
+-- ============================================================
+-- JUDGE ASSIGNMENTS
+-- ============================================================
+CREATE TABLE judge_assignments (
+  assignment_id     SERIAL PRIMARY KEY,
+  case_id           INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
+  judge_id          INT NOT NULL REFERENCES judges(judge_id) ON DELETE CASCADE,
+  assigned_by       INT REFERENCES court_administrators(admin_id),
+  assignment_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+  assignment_status VARCHAR(50) NOT NULL DEFAULT 'pending'
+                    CHECK (assignment_status IN ('pending', 'approved', 'rejected')),
+  rejection_reason  TEXT,
+  created_at        TIMESTAMP DEFAULT NOW(),
+  updated_at        TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================================
+-- HEARINGS
+-- ============================================================
 CREATE TABLE hearings (
-	id SERIAL PRIMARY KEY,
-	case_id INT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-	court_id INT NOT NULL REFERENCES courts(id) ON DELETE RESTRICT,
-	judge_id INT NOT NULL REFERENCES judges(id) ON DELETE RESTRICT,
-	scheduled_start TIMESTAMP NOT NULL,
-	scheduled_end TIMESTAMP NOT NULL,
-	hearing_type VARCHAR(40) NOT NULL CHECK (hearing_type IN ('mention', 'pre_trial', 'trial', 'ruling', 'appeal')),
-	status VARCHAR(30) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'ongoing', 'completed', 'adjourned', 'cancelled')),
-	meeting_link TEXT,
-	created_by INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-	created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-	CONSTRAINT hearing_time_valid CHECK (scheduled_end > scheduled_start)
+  hearing_id    SERIAL PRIMARY KEY,
+  case_id       INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
+  judge_id      INT REFERENCES judges(judge_id) ON DELETE SET NULL,
+  admin_id      INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
+  hearing_date  DATE NOT NULL,
+  hearing_time  TIME NOT NULL,
+  meeting_link  VARCHAR(255),
+  status        VARCHAR(50) NOT NULL DEFAULT 'requested'
+                CHECK (status IN ('requested', 'scheduled', 'completed', 'cancelled', 'postponed')),
+  hearing_notes TEXT,
+  created_at    TIMESTAMP DEFAULT NOW(),
+  updated_at    TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE case_participants (
-	id SERIAL PRIMARY KEY,
-	case_id INT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-	user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	participant_role VARCHAR(40) NOT NULL CHECK (participant_role IN ('plaintiff', 'defendant', 'lawyer', 'witness', 'clerk')),
-	joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
-	UNIQUE (case_id, user_id, participant_role)
-);
-
+-- ============================================================
+-- DOCUMENTS
+-- ============================================================
 CREATE TABLE documents (
-	id SERIAL PRIMARY KEY,
-	case_id INT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-	uploaded_by INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-	file_name VARCHAR(180) NOT NULL,
-	file_path TEXT NOT NULL,
-	mime_type VARCHAR(80),
-	file_size BIGINT,
-	uploaded_at TIMESTAMP NOT NULL DEFAULT NOW()
+  document_id    SERIAL PRIMARY KEY,
+  case_id        INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
+  participant_id INT REFERENCES litigants_advocates(participant_id) ON DELETE SET NULL,
+  uploaded_by    INT REFERENCES users(user_id) ON DELETE SET NULL,
+  document_name  VARCHAR(200) NOT NULL,
+  document_type  VARCHAR(100) NOT NULL,
+  file_path      VARCHAR(255) NOT NULL,
+  upload_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at     TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE notifications (
-	id SERIAL PRIMARY KEY,
-	user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	title VARCHAR(180) NOT NULL,
-	message TEXT NOT NULL,
-	is_read BOOLEAN NOT NULL DEFAULT FALSE,
-	created_at TIMESTAMP NOT NULL DEFAULT NOW()
+-- ============================================================
+-- RULINGS
+-- ============================================================
+CREATE TABLE rulings (
+  ruling_id    SERIAL PRIMARY KEY,
+  case_id      INT NOT NULL UNIQUE REFERENCES cases(case_id) ON DELETE CASCADE,
+  judge_id     INT NOT NULL REFERENCES judges(judge_id) ON DELETE CASCADE,
+  ruling_text  TEXT NOT NULL,
+  ruling_date  DATE NOT NULL DEFAULT CURRENT_DATE,
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  published_at TIMESTAMP,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  updated_at   TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_cases_status ON cases(status);
-CREATE INDEX idx_cases_case_type ON cases(case_type_id);
-CREATE INDEX idx_hearings_case ON hearings(case_id);
-CREATE INDEX idx_hearings_status ON hearings(status);
-CREATE INDEX idx_documents_case ON documents(case_id);
+-- ============================================================
+-- INDEXES
+-- ============================================================
+CREATE INDEX idx_users_email          ON users(email);
+CREATE INDEX idx_users_role           ON users(role);
+CREATE INDEX idx_cases_status         ON cases(case_status);
+CREATE INDEX idx_cases_participant    ON cases(participant_id);
+CREATE INDEX idx_hearings_case        ON hearings(case_id);
+CREATE INDEX idx_hearings_judge       ON hearings(judge_id);
+CREATE INDEX idx_hearings_date        ON hearings(hearing_date);
+CREATE INDEX idx_documents_case       ON documents(case_id);
+CREATE INDEX idx_assignments_case     ON judge_assignments(case_id);
+CREATE INDEX idx_assignments_judge    ON judge_assignments(judge_id);
+CREATE INDEX idx_rulings_case         ON rulings(case_id);
 
-COMMIT;
+-- ============================================================
+-- AUTO-UPDATE updated_at TRIGGER
+-- ============================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_cases_updated_at
+  BEFORE UPDATE ON cases
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_hearings_updated_at
+  BEFORE UPDATE ON hearings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_assignments_updated_at
+  BEFORE UPDATE ON judge_assignments
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_rulings_updated_at
+  BEFORE UPDATE ON rulings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

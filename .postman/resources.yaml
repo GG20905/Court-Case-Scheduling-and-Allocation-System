@@ -1,0 +1,8 @@
+# Use this workspace to collaborate
+workspace:
+  id: 81b954d0-af81-4cac-8060-d90913398184
+
+localResources:
+  collections:
+    - ..\Court system api.postman collection.json
+    - ..\Court-system-api.postman_collection.json
