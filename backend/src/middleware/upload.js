@@ -2,6 +2,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const isPdfUpload = (file) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  return file.mimetype === 'application/pdf' && ext === '.pdf';
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const caseId = req.body.case_id || req.params.caseId || 'general';
@@ -16,17 +21,10 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-  ];
-  if (allowed.includes(file.mimetype)) {
+  if (isPdfUpload(file)) {
     cb(null, true);
   } else {
-    cb(new Error('Only PDF, DOC, DOCX, JPG and PNG files are allowed.'), false);
+    cb(new Error('Only PDF files are allowed.'), false);
   }
 };
 
