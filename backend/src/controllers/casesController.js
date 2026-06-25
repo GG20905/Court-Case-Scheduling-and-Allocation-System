@@ -1,5 +1,16 @@
 const pool = require('../config/db');
 
+const VALID_CASE_STATUSES = ['pending', 'active', 'scheduled', 'closed', 'dismissed'];
+const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+
+const parsePositiveIntId = (value) => {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+  return id;
+};
+
 // POST /api/cases
 const createCase = async (req, res) => {
   try {
@@ -73,7 +84,11 @@ const getCases = async (req, res) => {
 // GET /api/cases/:id
 const getCaseById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const parsedCaseId = parsePositiveIntId(req.params.id);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
     const result = await pool.query(
       `SELECT c.*,
         la.full_name AS submitted_by, la.participant_type,
@@ -89,7 +104,7 @@ const getCaseById = async (req, res) => {
        LEFT JOIN judges j ON ja.judge_id = j.judge_id
        LEFT JOIN rulings r ON r.case_id = c.case_id
        WHERE c.case_id = $1`,
-      [id]
+      [parsedCaseId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Case not found.' });
@@ -104,8 +119,41 @@ const getCaseById = async (req, res) => {
 // PATCH /api/cases/:id/status  (kept for compatibility)
 const updateCaseStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const parsedCaseId = parsePositiveIntId(req.params.id);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
     const { case_status, priority } = req.body;
+
+    if (case_status === undefined && priority === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide at least one field to update: case_status or priority.',
+      });
+    }
+
+    if (case_status !== undefined && typeof case_status === 'string' && case_status.trim() === '') {
+      return res.status(400).json({ success: false, message: 'case_status cannot be empty.' });
+    }
+
+    if (priority !== undefined && typeof priority === 'string' && priority.trim() === '') {
+      return res.status(400).json({ success: false, message: 'priority cannot be empty.' });
+    }
+
+    if (case_status !== undefined && !VALID_CASE_STATUSES.includes(case_status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid case_status. Allowed values: ${VALID_CASE_STATUSES.join(', ')}.`,
+      });
+    }
+
+    if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid priority. Allowed values: ${VALID_PRIORITIES.join(', ')}.`,
+      });
+    }
 
     const result = await pool.query(
       `UPDATE cases SET
@@ -113,7 +161,7 @@ const updateCaseStatus = async (req, res) => {
         priority = COALESCE($2, priority),
         updated_at = NOW()
        WHERE case_id = $3 RETURNING *`,
-      [case_status, priority, id]
+        [case_status, priority, parsedCaseId]
     );
 
     if (result.rows.length === 0) {
@@ -129,8 +177,41 @@ const updateCaseStatus = async (req, res) => {
 // PATCH /api/cases/:id/register  (admin: register & set priority)
 const registerCase = async (req, res) => {
   try {
-    const { id } = req.params;
+    const parsedCaseId = parsePositiveIntId(req.params.id);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
     const { priority, case_status } = req.body;
+
+    if (case_status === undefined && priority === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide at least one field to update: case_status or priority.',
+      });
+    }
+
+    if (case_status !== undefined && typeof case_status === 'string' && case_status.trim() === '') {
+      return res.status(400).json({ success: false, message: 'case_status cannot be empty.' });
+    }
+
+    if (priority !== undefined && typeof priority === 'string' && priority.trim() === '') {
+      return res.status(400).json({ success: false, message: 'priority cannot be empty.' });
+    }
+
+    if (case_status !== undefined && !VALID_CASE_STATUSES.includes(case_status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid case_status. Allowed values: ${VALID_CASE_STATUSES.join(', ')}.`,
+      });
+    }
+
+    if (priority !== undefined && !VALID_PRIORITIES.includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid priority. Allowed values: ${VALID_PRIORITIES.join(', ')}.`,
+      });
+    }
 
     const adminResult = await pool.query(
       'SELECT admin_id FROM court_administrators WHERE user_id = $1',
@@ -150,7 +231,7 @@ const registerCase = async (req, res) => {
         admin_id = $3,
         updated_at = NOW()
        WHERE case_id = $4 RETURNING *`,
-      [case_status, priority, admin_id, id]
+      [case_status, priority, admin_id, parsedCaseId]
     );
 
     if (result.rows.length === 0) {
