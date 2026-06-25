@@ -3,12 +3,146 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
+const isResendConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM);
+const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
+const allowDevelopmentCodeFallback = (process.env.ALLOW_DEV_2FA_FALLBACK || 'false') === 'true';
+const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
+
 const generateToken = (user) => {
   return jwt.sign(
     { user_id: user.user_id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
+};
+
+const generateTwoFactorChallengeToken = (user) => {
+  const require2fa = Boolean(user.two_factor_enabled || isTwoFactorRequiredByDefault);
+  return jwt.sign(
+    { user_id: user.user_id, email: user.email, role: user.role, purpose: '2fa-login', require_2fa: require2fa },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.TWO_FACTOR_LOGIN_TOKEN_EXPIRES_IN || '10m' }
+  );
+};
+
+const generateEmailOtpCode = () => {
+  return String(Math.floor(100000 + Math.random() * 900000));
+};
+
+const authSuccessResponse = (user, token, message = 'Login successful.') => ({
+  success: true,
+  message,
+  data: { user_id: user.user_id, full_name: user.full_name, email: user.email, role: user.role },
+  token,
+});
+
+const validateTwoFactorToken = (twoFactorToken) => {
+  if (!twoFactorToken) {
+    return { ok: false, status: 400, message: 'two_factor_token is required.' };
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(twoFactorToken, process.env.JWT_SECRET);
+  } catch (_err) {
+    return { ok: false, status: 401, message: 'Invalid or expired 2FA token.' };
+  }
+
+  if (decoded.purpose !== '2fa-login') {
+    return { ok: false, status: 401, message: 'Invalid 2FA challenge.' };
+  }
+
+  return { ok: true, decoded };
+};
+
+const insertRoleRecord = async (client, role, user, fullName, email, hashedPassword, participantType, courtStation) => {
+  if (role === 'admin') {
+    return client.query(
+      `INSERT INTO court_administrators (user_id, full_name, email, password)
+       VALUES ($1, $2, $3, $4)`,
+      [user.user_id, fullName, email, hashedPassword]
+    );
+  }
+
+  if (role === 'judge') {
+    return client.query(
+      `INSERT INTO judges (user_id, full_name, email, password, court_station)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user.user_id, fullName, email, hashedPassword, courtStation]
+    );
+  }
+
+  return client.query(
+    `INSERT INTO litigants_advocates (user_id, full_name, email, password, participant_type)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [user.user_id, fullName, email, hashedPassword, participantType]
+  );
+};
+
+const buildOtpMessage = (code) => ({
+  subject: 'Your Court System verification code',
+  text: `Your login verification code is ${code}. It expires in 10 minutes.`,
+  html: `<p>Your login verification code is <strong>${code}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+});
+
+const sendViaResendApi = async (toEmail, code) => {
+  if (!isResendConfigured) {
+    throw new Error('Resend API is not configured on the server.');
+  }
+
+  const message = buildOtpMessage(code);
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM,
+      to: [toEmail],
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    }),
+  });
+
+  if (!response.ok) {
+    const bodyText = await response.text();
+    throw new Error(`Resend API error ${response.status}: ${bodyText || 'Unknown error'}`);
+  }
+
+  return true;
+};
+
+const sendTwoFactorCodeEmail = async (toEmail, code) => {
+  try {
+    await sendViaResendApi(toEmail, code);
+    return true;
+  } catch (err) {
+    console.error('2FA email delivery error (resend):', err.message);
+    return false;
+  }
+};
+
+const issueAndSendTwoFactorCode = async (user) => {
+  const code = generateEmailOtpCode();
+  const codeHash = await bcrypt.hash(code, 10);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  await pool.query(
+    `UPDATE users
+     SET two_factor_code_hash = $1,
+         two_factor_code_expires_at = $2
+     WHERE user_id = $3`,
+    [codeHash, expiresAt, user.user_id]
+  );
+
+  const emailDelivered = await sendTwoFactorCodeEmail(user.email, code);
+
+  return {
+    emailDelivered,
+    code,
+  };
 };
 
 // POST /api/auth/register
@@ -21,7 +155,6 @@ const register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'full_name, email, password and role are required.' });
     }
 
-    const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ success: false, message: `Role must be one of: ${validRoles.join(', ')}.` });
     }
@@ -52,35 +185,12 @@ const register = async (req, res) => {
     );
     const user = userResult.rows[0];
 
-    if (role === 'admin') {
-      await client.query(
-        `INSERT INTO court_administrators (user_id, full_name, email, password)
-         VALUES ($1, $2, $3, $4)`,
-        [user.user_id, full_name, email, hashedPassword]
-      );
-    } else if (role === 'judge') {
-      await client.query(
-        `INSERT INTO judges (user_id, full_name, email, password, court_station)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [user.user_id, full_name, email, hashedPassword, court_station]
-      );
-    } else {
-      await client.query(
-        `INSERT INTO litigants_advocates (user_id, full_name, email, password, participant_type)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [user.user_id, full_name, email, hashedPassword, participant_type]
-      );
-    }
+    await insertRoleRecord(client, role, user, full_name, email, hashedPassword, participant_type, court_station);
 
     await client.query('COMMIT');
     const token = generateToken(user);
 
-    return res.status(201).json({
-      success: true,
-      message: 'Registration successful.',
-      data: { user_id: user.user_id, full_name: user.full_name, email: user.email, role: user.role },
-      token,
-    });
+    return res.status(201).json(authSuccessResponse(user, token, 'Registration successful.'));
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Register error:', err);
@@ -99,7 +209,7 @@ const login = async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT user_id, full_name, email, password, role FROM users WHERE email = $1',
+      'SELECT user_id, full_name, email, password, role, two_factor_enabled FROM users WHERE email = $1',
       [email]
     );
 
@@ -113,16 +223,222 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
+    if (user.two_factor_enabled || isTwoFactorRequiredByDefault) {
+      const issued = await issueAndSendTwoFactorCode(user);
+
+      const twoFactorToken = generateTwoFactorChallengeToken(user);
+      const responseBody = {
+        success: true,
+        requires_2fa: true,
+        message: issued.emailDelivered
+          ? 'Verification code sent to your email.'
+          : 'Email code was not sent. Please retry.',
+        two_factor_token: twoFactorToken,
+      };
+
+      if (!issued.emailDelivered && process.env.NODE_ENV !== 'production' && allowDevelopmentCodeFallback) {
+        responseBody.development_code = issued.code;
+      }
+
+      return res.status(200).json(responseBody);
+    }
+
     const token = generateToken(user);
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful.',
-      data: { user_id: user.user_id, full_name: user.full_name, email: user.email, role: user.role },
-      token,
-    });
+    return res.status(200).json(authSuccessResponse(user, token));
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ success: false, message: 'Server error during login.' });
+  }
+};
+
+// POST /api/auth/login/2fa
+const loginWith2FA = async (req, res) => {
+  try {
+    const { two_factor_token, code } = req.body;
+
+    if (!two_factor_token || !code) {
+      return res.status(400).json({ success: false, message: 'two_factor_token and code are required.' });
+    }
+
+    const tokenValidation = validateTwoFactorToken(two_factor_token);
+    if (!tokenValidation.ok) {
+      return res.status(tokenValidation.status).json({ success: false, message: tokenValidation.message });
+    }
+    const { decoded } = tokenValidation;
+
+    const result = await pool.query(
+      `SELECT user_id, full_name, email, role, two_factor_enabled, two_factor_code_hash, two_factor_code_expires_at
+       FROM users
+       WHERE user_id = $1`,
+      [decoded.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = result.rows[0];
+    const requires2FA = Boolean(user.two_factor_enabled || decoded.require_2fa);
+    if (!requires2FA || !user.two_factor_code_hash) {
+      return res.status(400).json({ success: false, message: '2FA is not enabled for this account.' });
+    }
+
+    if (!user.two_factor_code_expires_at || new Date(user.two_factor_code_expires_at) < new Date()) {
+      return res.status(401).json({ success: false, message: '2FA code expired. Please login again.' });
+    }
+
+    const codeMatches = await bcrypt.compare(String(code).trim(), user.two_factor_code_hash);
+    if (!codeMatches) {
+      return res.status(401).json({ success: false, message: 'Invalid 2FA code.' });
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET two_factor_code_hash = NULL,
+           two_factor_code_expires_at = NULL
+       WHERE user_id = $1`,
+      [user.user_id]
+    );
+
+    const token = generateToken(user);
+    return res.status(200).json(authSuccessResponse(user, token));
+  } catch (err) {
+    console.error('2FA login error:', err);
+    return res.status(500).json({ success: false, message: 'Server error during 2FA login.' });
+  }
+};
+
+// POST /api/auth/login/2fa/resend
+const resendLogin2FACode = async (req, res) => {
+  try {
+    const { two_factor_token } = req.body;
+    const tokenValidation = validateTwoFactorToken(two_factor_token);
+    if (!tokenValidation.ok) {
+      return res.status(tokenValidation.status).json({ success: false, message: tokenValidation.message });
+    }
+    const { decoded } = tokenValidation;
+
+    const result = await pool.query(
+      'SELECT user_id, email, two_factor_enabled FROM users WHERE user_id = $1',
+      [decoded.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = result.rows[0];
+    const requires2FA = Boolean(user.two_factor_enabled || decoded.require_2fa);
+    if (!requires2FA) {
+      return res.status(400).json({ success: false, message: '2FA is not enabled for this account.' });
+    }
+
+    const issued = await issueAndSendTwoFactorCode(user);
+    const responseBody = {
+      success: true,
+      message: issued.emailDelivered
+        ? 'A new verification code has been sent to your email.'
+        : 'Email code was not sent. Please retry.',
+    };
+
+    if (!issued.emailDelivered && process.env.NODE_ENV !== 'production' && allowDevelopmentCodeFallback) {
+      responseBody.development_code = issued.code;
+    }
+
+    return res.status(200).json(responseBody);
+  } catch (err) {
+    console.error('Resend 2FA code error:', err);
+    return res.status(500).json({ success: false, message: 'Server error while resending 2FA code.' });
+  }
+};
+
+// POST /api/auth/2fa/setup
+const setup2FA = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT user_id FROM users WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET two_factor_enabled = FALSE,
+           two_factor_code_hash = NULL,
+           two_factor_code_expires_at = NULL
+       WHERE user_id = $1`,
+      [req.user.user_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: '2FA setup is ready for email delivery. Enable 2FA to require email verification codes on login.',
+    });
+  } catch (err) {
+    console.error('2FA setup error:', err);
+    return res.status(500).json({ success: false, message: 'Server error during 2FA setup.' });
+  }
+};
+
+// POST /api/auth/2fa/enable
+const enable2FA = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT user_id FROM users WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET two_factor_enabled = TRUE
+       WHERE user_id = $1`,
+      [req.user.user_id]
+    );
+
+    return res.status(200).json({ success: true, message: 'Email 2FA enabled successfully.' });
+  } catch (err) {
+    console.error('Enable 2FA error:', err);
+    return res.status(500).json({ success: false, message: 'Server error while enabling 2FA.' });
+  }
+};
+
+// POST /api/auth/2fa/disable
+const disable2FA = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT user_id, two_factor_enabled FROM users WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = result.rows[0];
+    if (!user.two_factor_enabled) {
+      return res.status(400).json({ success: false, message: '2FA is not enabled for this account.' });
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET two_factor_enabled = FALSE,
+           two_factor_code_hash = NULL,
+           two_factor_code_expires_at = NULL
+       WHERE user_id = $1`,
+      [user.user_id]
+    );
+
+    return res.status(200).json({ success: true, message: '2FA disabled successfully.' });
+  } catch (err) {
+    console.error('Disable 2FA error:', err);
+    return res.status(500).json({ success: false, message: 'Server error while disabling 2FA.' });
   }
 };
 
@@ -130,7 +446,7 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT user_id, full_name, email, role, created_at FROM users WHERE user_id = $1',
+      'SELECT user_id, full_name, email, role, two_factor_enabled, created_at FROM users WHERE user_id = $1',
       [req.user.user_id]
     );
     if (result.rows.length === 0) {
@@ -161,4 +477,15 @@ const createUser = async (req, res) => {
   return register(req, res);
 };
 
-module.exports = { register, login, getMe, getUsers, createUser };
+module.exports = {
+  register,
+  login,
+  loginWith2FA,
+  resendLogin2FACode,
+  setup2FA,
+  enable2FA,
+  disable2FA,
+  getMe,
+  getUsers,
+  createUser,
+};

@@ -8,6 +8,9 @@ CREATE TABLE users (
   email      VARCHAR(150) NOT NULL UNIQUE,
   password   VARCHAR(255) NOT NULL,
   role       VARCHAR(50)  NOT NULL CHECK (role IN ('litigant', 'advocate', 'judge', 'admin')),
+  two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  two_factor_code_hash VARCHAR(255),
+  two_factor_code_expires_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

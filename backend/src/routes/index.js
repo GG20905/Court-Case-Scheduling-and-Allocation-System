@@ -14,7 +14,12 @@ const dashboardController = require('../controllers/dashboardController');
 // ─── AUTH ─────────────────────────────────────────────────────
 router.post('/auth/register', usersController.register);
 router.post('/auth/login', usersController.login);
+router.post('/auth/login/2fa', usersController.loginWith2FA);
+router.post('/auth/login/2fa/resend', usersController.resendLogin2FACode);
 router.get('/auth/me', authenticate, usersController.getMe);
+router.post('/auth/2fa/setup', authenticate, usersController.setup2FA);
+router.post('/auth/2fa/enable', authenticate, usersController.enable2FA);
+router.post('/auth/2fa/disable', authenticate, usersController.disable2FA);
 
 // ─── USERS (admin) ────────────────────────────────────────────
 router.get('/users', authenticate, authorize('admin'), usersController.getUsers);

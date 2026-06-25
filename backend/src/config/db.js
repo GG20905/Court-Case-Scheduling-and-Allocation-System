@@ -9,11 +9,34 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-pool.connect()
-  .then(() => console.log('✅ Connected to PostgreSQL database'))
-  .catch(err => {
+const initializeDatabase = async () => {
+  const client = await pool.connect();
+  try {
+    await client.query('SELECT 1');
+    const tableCheck = await client.query(`SELECT to_regclass('public.users') AS users_table`);
+    if (tableCheck.rows[0]?.users_table) {
+      await client.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+      `);
+      await client.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS two_factor_code_hash VARCHAR(255);
+      `);
+      await client.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS two_factor_code_expires_at TIMESTAMP;
+      `);
+    }
+    console.log('✅ Connected to PostgreSQL database');
+  } catch (err) {
     console.error('❌ Database connection error:', err.message);
     process.exit(1);
-  });
+  } finally {
+    client.release();
+  }
+};
+
+initializeDatabase();
 
 module.exports = pool;
