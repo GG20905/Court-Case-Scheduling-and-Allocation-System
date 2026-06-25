@@ -2,17 +2,29 @@ const pool = require('../config/db');
 const path = require('path');
 const fs = require('fs');
 
+const parsePositiveIntId = (value) => {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+  return id;
+};
+
 // POST /api/cases/:caseId/documents
 const createDocument = async (req, res) => {
   try {
+    const parsedCaseId = parsePositiveIntId(req.params.caseId);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded.' });
     }
 
-    const { caseId } = req.params;
     const { document_type } = req.body;
 
-    if (!document_type) {
+    if (!document_type || !String(document_type).trim()) {
       return res.status(400).json({ success: false, message: 'document_type is required.' });
     }
 
@@ -29,7 +41,7 @@ const createDocument = async (req, res) => {
 
     const caseCheck = await pool.query(
       'SELECT case_id FROM cases WHERE case_id = $1 AND participant_id = $2',
-      [caseId, participant_id]
+      [parsedCaseId, participant_id]
     );
 
     if (caseCheck.rows.length === 0) {
@@ -39,7 +51,7 @@ const createDocument = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO documents (case_id, participant_id, uploaded_by, document_name, document_type, file_path)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [caseId, participant_id, req.user.user_id, req.file.originalname, document_type, req.file.path]
+      [parsedCaseId, participant_id, req.user.user_id, req.file.originalname, document_type.trim(), req.file.path]
     );
 
     return res.status(201).json({ success: true, message: 'Document uploaded successfully.', data: result.rows[0] });
@@ -52,13 +64,17 @@ const createDocument = async (req, res) => {
 // GET /api/cases/:caseId/documents
 const getDocumentsByCase = async (req, res) => {
   try {
-    const { caseId } = req.params;
+    const parsedCaseId = parsePositiveIntId(req.params.caseId);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
     const result = await pool.query(
       `SELECT d.*, la.full_name AS uploaded_by_name
        FROM documents d
        LEFT JOIN litigants_advocates la ON d.participant_id = la.participant_id
        WHERE d.case_id = $1 ORDER BY d.created_at DESC`,
-      [caseId]
+      [parsedCaseId]
     );
     return res.status(200).json({ success: true, count: result.rows.length, data: result.rows });
   } catch (err) {
@@ -70,8 +86,12 @@ const getDocumentsByCase = async (req, res) => {
 // GET /api/documents/:id/download
 const downloadDocument = async (req, res) => {
   try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT * FROM documents WHERE document_id = $1', [id]);
+    const parsedDocumentId = parsePositiveIntId(req.params.id);
+    if (!parsedDocumentId) {
+      return res.status(400).json({ success: false, message: 'Invalid document ID. It must be a positive integer.' });
+    }
+
+    const result = await pool.query('SELECT * FROM documents WHERE document_id = $1', [parsedDocumentId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Document not found.' });
     }
@@ -90,8 +110,12 @@ const downloadDocument = async (req, res) => {
 // DELETE /api/documents/:id
 const deleteDocument = async (req, res) => {
   try {
-    const { id } = req.params;
-    const docResult = await pool.query('SELECT * FROM documents WHERE document_id = $1', [id]);
+    const parsedDocumentId = parsePositiveIntId(req.params.id);
+    if (!parsedDocumentId) {
+      return res.status(400).json({ success: false, message: 'Invalid document ID. It must be a positive integer.' });
+    }
+
+    const docResult = await pool.query('SELECT * FROM documents WHERE document_id = $1', [parsedDocumentId]);
     if (docResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Document not found.' });
     }
@@ -101,7 +125,7 @@ const deleteDocument = async (req, res) => {
     }
     const filePath = path.resolve(doc.file_path);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    await pool.query('DELETE FROM documents WHERE document_id = $1', [id]);
+    await pool.query('DELETE FROM documents WHERE document_id = $1', [parsedDocumentId]);
     return res.status(200).json({ success: true, message: 'Document deleted.' });
   } catch (err) {
     console.error('deleteDocument error:', err);
