@@ -25,6 +25,17 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', apiRouter);
 
 app.use((err, _req, res, _next) => {
+	if (err && err.name === 'MulterError') {
+		if (err.code === 'LIMIT_FILE_SIZE') {
+			return res.status(400).json({ success: false, message: 'File is too large. Maximum size is 10MB.' });
+		}
+		return res.status(400).json({ success: false, message: err.message || 'File upload error.' });
+	}
+
+	if (err && typeof err.message === 'string' && err.message.includes('Only PDF files are allowed.')) {
+		return res.status(400).json({ success: false, message: err.message });
+	}
+
 	console.error(err);
 	res.status(500).json({ message: 'Internal server error', details: err.message });
 });
