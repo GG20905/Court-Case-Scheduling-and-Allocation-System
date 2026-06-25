@@ -14,11 +14,48 @@ body {
 /* ── Navbar ─────────────────────────────────── */
 .navbar {
   background-color: #0d1652;
-  height: 64px;
+  min-height: 78px;
   width: 100%;
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.navbar-inner {
+  min-height: 78px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar-logo {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
+.navbar-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.05;
+}
+
+.navbar-title {
+  font-size: 20px;
+  color: #ffffff;
+  margin: 0;
+  font-weight: 700;
+}
+
+.navbar-subtitle {
+  font-size: 13px;
+  color: #d2ddff;
+  margin: 0;
+  font-weight: 500;
 }
  
 /* ── Page layout ────────────────────────────── */
