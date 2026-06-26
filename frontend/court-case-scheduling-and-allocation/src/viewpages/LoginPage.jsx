@@ -32,7 +32,6 @@ export default function LoginPage() {
           state: {
             twoFactorToken: data.two_factor_token || '',
             infoMessage: data.message,
-            developmentCode: data.development_code || '',
             emailDelivery: data.email_delivery || '',
             emailDeliveryReason: data.email_delivery_reason || '',
             emailDeliveryDetail: data.email_delivery_detail || '',

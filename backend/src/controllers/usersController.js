@@ -3,9 +3,8 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-const isResendConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM);
+const isBrevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
 const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
-const allowDevelopmentCodeFallback = (process.env.ALLOW_DEV_2FA_FALLBACK || 'false') === 'true';
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
 
 const generateToken = (user) => {
@@ -85,43 +84,67 @@ const buildOtpMessage = (code) => ({
   html: `<p>Your login verification code is <strong>${code}</strong>.</p><p>This code expires in 10 minutes.</p>`,
 });
 
-const sendViaResendApi = async (toEmail, code) => {
-  if (!isResendConfigured) {
-    throw new Error('Resend API is not configured on the server.');
+const sendViaBrevoApi = async (toEmail, code) => {
+  if (!isBrevoConfigured) {
+    throw new Error('Brevo API is not configured on the server.');
   }
 
   const message = buildOtpMessage(code);
-  const response = await fetch('https://api.resend.com/emails', {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'api-key': process.env.BREVO_API_KEY,
       'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM,
-      to: [toEmail],
+      sender: {
+        email: process.env.BREVO_FROM_EMAIL,
+        name: process.env.BREVO_FROM_NAME || 'Court System',
+      },
+      to: [{ email: toEmail }],
       subject: message.subject,
-      html: message.html,
-      text: message.text,
+      htmlContent: message.html,
+      textContent: message.text,
     }),
   });
 
   if (!response.ok) {
     const bodyText = await response.text();
-    throw new Error(`Resend API error ${response.status}: ${bodyText || 'Unknown error'}`);
+    throw new Error(`Brevo API error ${response.status}: ${bodyText || 'Unknown error'}`);
   }
 
   return true;
 };
 
 const sendTwoFactorCodeEmail = async (toEmail, code) => {
-  try {
-    await sendViaResendApi(toEmail, code);
-    return true;
-  } catch (err) {
-    console.error('2FA email delivery error (resend):', err.message);
-    return false;
+  const attempts = [];
+
+  if (isBrevoConfigured) {
+    try {
+      await sendViaBrevoApi(toEmail, code);
+      return {
+        delivered: true,
+        provider: 'brevo',
+        reason: 'sent',
+        detail: '2FA code sent using Brevo API.',
+      };
+    } catch (err) {
+      console.error('2FA email delivery error (brevo):', err.message);
+      attempts.push(`brevo: ${err.message}`);
+    }
   }
+
+  if (!isBrevoConfigured) {
+    attempts.push('No email provider configured. Add Brevo credentials in backend/.env.');
+  }
+
+  return {
+    delivered: false,
+    provider: 'none',
+    reason: 'provider_failed_or_missing',
+    detail: attempts.join(' | '),
+  };
 };
 
 const issueAndSendTwoFactorCode = async (user) => {
@@ -137,11 +160,10 @@ const issueAndSendTwoFactorCode = async (user) => {
     [codeHash, expiresAt, user.user_id]
   );
 
-  const emailDelivered = await sendTwoFactorCodeEmail(user.email, code);
+  const delivery = await sendTwoFactorCodeEmail(user.email, code);
 
   return {
-    emailDelivered,
-    code,
+    delivery,
   };
 };
 
@@ -225,20 +247,21 @@ const login = async (req, res) => {
 
     if (user.two_factor_enabled || isTwoFactorRequiredByDefault) {
       const issued = await issueAndSendTwoFactorCode(user);
+      const emailDelivered = Boolean(issued.delivery?.delivered);
 
       const twoFactorToken = generateTwoFactorChallengeToken(user);
       const responseBody = {
         success: true,
         requires_2fa: true,
-        message: issued.emailDelivered
+        message: emailDelivered
           ? 'Verification code sent to your email.'
           : 'Email code was not sent. Please retry.',
         two_factor_token: twoFactorToken,
+        email_delivery: emailDelivered ? 'sent' : 'failed',
+        email_delivery_provider: issued.delivery?.provider || 'none',
+        email_delivery_reason: issued.delivery?.reason || '',
+        email_delivery_detail: issued.delivery?.detail || '',
       };
-
-      if (!issued.emailDelivered && process.env.NODE_ENV !== 'production' && allowDevelopmentCodeFallback) {
-        responseBody.development_code = issued.code;
-      }
 
       return res.status(200).json(responseBody);
     }
@@ -334,16 +357,17 @@ const resendLogin2FACode = async (req, res) => {
     }
 
     const issued = await issueAndSendTwoFactorCode(user);
+    const emailDelivered = Boolean(issued.delivery?.delivered);
     const responseBody = {
       success: true,
-      message: issued.emailDelivered
+      message: emailDelivered
         ? 'A new verification code has been sent to your email.'
         : 'Email code was not sent. Please retry.',
+      email_delivery: emailDelivered ? 'sent' : 'failed',
+      email_delivery_provider: issued.delivery?.provider || 'none',
+      email_delivery_reason: issued.delivery?.reason || '',
+      email_delivery_detail: issued.delivery?.detail || '',
     };
-
-    if (!issued.emailDelivered && process.env.NODE_ENV !== 'production' && allowDevelopmentCodeFallback) {
-      responseBody.development_code = issued.code;
-    }
 
     return res.status(200).json(responseBody);
   } catch (err) {

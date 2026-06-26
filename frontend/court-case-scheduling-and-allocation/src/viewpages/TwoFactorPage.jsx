@@ -19,6 +19,9 @@ export default function TwoFactorPage() {
   );
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [deliveryProvider, setDeliveryProvider] = useState(location.state?.emailDeliveryProvider || '');
+  const [deliveryReason, setDeliveryReason] = useState(location.state?.emailDeliveryReason || '');
+  const [deliveryDetail, setDeliveryDetail] = useState(location.state?.emailDeliveryDetail || '');
 
   const twoFactorToken = useMemo(() => location.state?.twoFactorToken || '', [location.state]);
   const email = location.state?.email || '';
@@ -81,6 +84,9 @@ export default function TwoFactorPage() {
       const data = await res.json();
       if (res.ok) {
         setInfo(cleanInfoMessage(data.message) || 'A new code has been sent to your email.');
+        if (data.email_delivery_provider) setDeliveryProvider(data.email_delivery_provider);
+        if (data.email_delivery_reason) setDeliveryReason(data.email_delivery_reason);
+        if (data.email_delivery_detail) setDeliveryDetail(data.email_delivery_detail);
       } else {
         setError(data.message || 'Failed to resend code.');
       }
@@ -100,6 +106,15 @@ export default function TwoFactorPage() {
 
           {email && <p className="form-footer">Code destination: {email}</p>}
           {info && <p className="form-footer">{info}</p>}
+          {!info && deliveryProvider && (
+            <p className="form-footer">Email provider used: {deliveryProvider}</p>
+          )}
+          {!info && deliveryReason && deliveryReason !== 'sent' && (
+            <p className="form-footer">Delivery status: {deliveryReason}</p>
+          )}
+          {!info && deliveryDetail && (
+            <p className="form-footer">Delivery detail: {deliveryDetail}</p>
+          )}
           {error && <p className="form-error">{error}</p>}
 
           <label className="field-label">Verification Code</label>

@@ -31,15 +31,19 @@ backend/.env
 
 2FA is supported using email OTP (a 6-digit code sent to the user's email).
 
-### Resend API settings (.env)
+### 2FA email providers (.env)
 
-2FA email delivery now uses Resend API only.
+2FA email delivery uses Brevo API.
 
-Add these values to backend/.env:
+Fallback behavior:
 
-- `RESEND_API_KEY=...`
-- `RESEND_FROM=Virtual Court <noreply@your-domain.com>`
-- `ALLOW_DEV_2FA_FALLBACK` (optional, default `false`; set to `true` only for local dev to expose `development_code` if email fails)
+1. Brevo API delivery
+
+Brevo settings:
+
+- `BREVO_API_KEY=...`
+- `BREVO_FROM_EMAIL=you@your-email.com`
+- `BREVO_FROM_NAME=Virtual Court` (optional)
 
 ### API flow
 
@@ -56,7 +60,7 @@ Add these values to backend/.env:
 2. If 2FA is enabled, response contains:
 	- `requires_2fa: true`
 	- `two_factor_token`
-	- In local/dev when Resend is not configured and `ALLOW_DEV_2FA_FALLBACK=true`, response includes `development_code`.
+	- Delivery diagnostics: `email_delivery`, `email_delivery_provider`, `email_delivery_reason`, `email_delivery_detail`
 3. Submit OTP code:
 	- `POST /api/auth/login/2fa` with body `{ "two_factor_token": "...", "code": "123456" }`
 4. Resend OTP code:
