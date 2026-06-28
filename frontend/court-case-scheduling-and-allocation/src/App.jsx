@@ -2,6 +2,23 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './viewpages/LoginPage';
 import RegisterPage from './viewpages/RegisterPage';
 import TwoFactorPage from './viewpages/TwoFactorPage';
+import LitigantDashboard from './viewpages/Lit,Adv';
+import JudgeDashboard from './viewpages/Judge';
+import JudgeCaseTab from './viewpages/JudgeCaseTab';
+import JudgeSchedule from './viewpages/JudgeSchedule';
+import JudgeDocument from './viewpages/JudgeDocument';
+import CourtAdminDashboard from './viewpages/Courtadmin';
+import { getDashboardPathForRole, getStoredAuthToken, getStoredAuthUser } from './utils/auth';
+
+function RequireAuth({ children }) {
+  const token = getStoredAuthToken();
+  return token ? children : <Navigate to="/login" replace />;
+}
+
+function DashboardRedirect() {
+  const user = getStoredAuthUser();
+  return <Navigate to={getDashboardPathForRole(user?.role)} replace />;
+}
 
 export default function App() {
   return (
@@ -11,6 +28,55 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/login/2fa" element={<TwoFactorPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/dashboard" element={<DashboardRedirect />} />
+        <Route
+          path="/dashboard/litigant"
+          element={(
+            <RequireAuth>
+              <LitigantDashboard />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/judge"
+          element={(
+            <RequireAuth>
+              <JudgeDashboard />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/judge/cases"
+          element={(
+            <RequireAuth>
+              <JudgeCaseTab />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/judge/schedule"
+          element={(
+            <RequireAuth>
+              <JudgeSchedule />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/judge/documents"
+          element={(
+            <RequireAuth>
+              <JudgeDocument />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/admin"
+          element={(
+            <RequireAuth>
+              <CourtAdminDashboard />
+            </RequireAuth>
+          )}
+        />
       </Routes>
     </BrowserRouter>
   );

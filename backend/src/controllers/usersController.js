@@ -7,6 +7,35 @@ const isBrevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO
 const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
 
+const normalizeLoginRoleSelection = (rawRole) => {
+  const value = String(rawRole || '').trim().toLowerCase();
+
+  if (!value) return '';
+  if (value === 'judge') return 'judge';
+  if (value === 'admin' || value === 'court administrator' || value === 'court_administrator') return 'admin';
+  if (
+    value === 'litigant_advocate' ||
+    value === 'litigant' ||
+    value === 'advocate' ||
+    value === 'advocate / litigant' ||
+    value === 'litigant / advocate'
+  ) {
+    return 'litigant_advocate';
+  }
+
+  return '';
+};
+
+const isLoginRoleAllowedForUser = (requestedRole, userRole) => {
+  if (!requestedRole) return false;
+
+  if (requestedRole === 'litigant_advocate') {
+    return userRole === 'litigant' || userRole === 'advocate';
+  }
+
+  return requestedRole === userRole;
+};
+
 const generateToken = (user) => {
   return jwt.sign(
     { user_id: user.user_id, email: user.email, role: user.role },
@@ -225,9 +254,14 @@ const register = async (req, res) => {
 // POST /api/auth/login
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required.' });
+    const { email, password, role } = req.body;
+    if (!email || !password || !role) {
+      return res.status(400).json({ success: false, message: 'Email, password and role are required.' });
+    }
+
+    const requestedRole = normalizeLoginRoleSelection(role);
+    if (!requestedRole) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     }
 
     const result = await pool.query(
@@ -240,6 +274,11 @@ const login = async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    if (!isLoginRoleAllowedForUser(requestedRole, user.role)) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials.' });
+    }
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res.status(401).json({ success: false, message: 'Invalid credentials.' });

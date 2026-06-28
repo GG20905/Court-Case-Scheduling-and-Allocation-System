@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "db:schema": "node src/scripts/setupSchema.js",
     "db:seed": "node src/scripts/runSeed.js",
+    "db:hash-passwords": "node src/scripts/hashExistingPasswords.js",
     "db:queries": "node src/scripts/runQueries.js",
     "db:reset": "npm run db:schema && npm run db:seed"
   },

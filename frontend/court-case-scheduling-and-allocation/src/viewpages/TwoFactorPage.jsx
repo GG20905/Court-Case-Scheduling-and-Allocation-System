@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { getDashboardPathForRole, persistAuthSession } from '../utils/auth';
 
 const cleanInfoMessage = (message) =>
   String(message || '')
@@ -53,7 +54,11 @@ export default function TwoFactorPage() {
 
       const data = await res.json();
       if (res.ok) {
-        navigate('/dashboard');
+        const user = data?.data || null;
+        const token = data?.token || '';
+
+        persistAuthSession({ token, user });
+        navigate(getDashboardPathForRole(user?.role), { replace: true });
       } else {
         setError(data.message || '2FA verification failed.');
       }
