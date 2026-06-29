@@ -3,11 +3,17 @@ import LoginPage from './viewpages/LoginPage';
 import RegisterPage from './viewpages/RegisterPage';
 import TwoFactorPage from './viewpages/TwoFactorPage';
 import LitigantDashboard from './viewpages/Lit,Adv';
+import LitAdvCases from './viewpages/LitAdvCases';
+import LitAdvSchedule from './viewpages/LitAdvSchedule';
+import LitAdvDocument from './viewpages/LitAdvDocument';
 import JudgeDashboard from './viewpages/Judge';
 import JudgeCaseTab from './viewpages/JudgeCaseTab';
 import JudgeSchedule from './viewpages/JudgeSchedule';
 import JudgeDocument from './viewpages/JudgeDocument';
 import CourtAdminDashboard from './viewpages/Courtadmin';
+import CourtadminCases from './viewpages/CourtadminCases';
+import CourtadminSchedule from './viewpages/CourtadminSchedule';
+import CourtadminDocuments from './viewpages/CourtadminDocuments';
 import { getDashboardPathForRole, getStoredAuthToken, getStoredAuthUser } from './utils/auth';
 
 function RequireAuth({ children }) {
@@ -34,6 +40,30 @@ export default function App() {
           element={(
             <RequireAuth>
               <LitigantDashboard />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/litigant/documents"
+          element={(
+            <RequireAuth>
+              <LitAdvDocument />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/litigant/cases"
+          element={(
+            <RequireAuth>
+              <LitAdvCases />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/litigant/schedule"
+          element={(
+            <RequireAuth>
+              <LitAdvSchedule />
             </RequireAuth>
           )}
         />
@@ -74,6 +104,30 @@ export default function App() {
           element={(
             <RequireAuth>
               <CourtAdminDashboard />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/admin/cases"
+          element={(
+            <RequireAuth>
+              <CourtadminCases />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/admin/schedule"
+          element={(
+            <RequireAuth>
+              <CourtadminSchedule />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/dashboard/admin/documents"
+          element={(
+            <RequireAuth>
+              <CourtadminDocuments />
             </RequireAuth>
           )}
         />
