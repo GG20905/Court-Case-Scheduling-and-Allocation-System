@@ -1,8 +1,36 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { getDashboardPathForRole, persistAuthSession } from '../utils/auth';
 
-const ROLES = ['Advocate / Litigant', 'Court Administrator', 'Judge'];
+const ROLE_OPTIONS = [
+  { label: 'Advocate / Litigant', value: 'litigant_advocate' },
+  { label: 'Court Administrator', value: 'admin' },
+  { label: 'Judge', value: 'judge' },
+];
+
+const decodeJwtPayload = (token) => {
+  try {
+    const payloadPart = String(token || '').split('.')[1] || '';
+    if (!payloadPart) return null;
+
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const roleMatchesSelection = (selectedRole, actualRole) => {
+  const normalizedActualRole = String(actualRole || '').toLowerCase();
+
+  if (selectedRole === 'litigant_advocate') {
+    return normalizedActualRole === 'litigant' || normalizedActualRole === 'advocate';
+  }
+
+  return selectedRole === normalizedActualRole;
+};
 
 export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState('');
@@ -28,11 +56,16 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (res.ok && data.requires_2fa) {
+        const tokenRole = decodeJwtPayload(data.two_factor_token)?.role || '';
+        if (!roleMatchesSelection(selectedRole, tokenRole)) {
+          setError('Invalid credentials.');
+          return;
+        }
+
         navigate('/login/2fa', {
           state: {
             twoFactorToken: data.two_factor_token || '',
             infoMessage: data.message,
-            developmentCode: data.development_code || '',
             emailDelivery: data.email_delivery || '',
             emailDeliveryReason: data.email_delivery_reason || '',
             emailDeliveryDetail: data.email_delivery_detail || '',
@@ -41,7 +74,16 @@ export default function LoginPage() {
           },
         });
       } else if (res.ok) {
-        setError('2FA challenge was not returned by the server. Please restart backend with the latest code.');
+        const user = data?.data || null;
+        const token = data?.token || '';
+
+        if (!roleMatchesSelection(selectedRole, user?.role)) {
+          setError('Invalid credentials.');
+          return;
+        }
+
+        persistAuthSession({ token, user });
+        navigate(getDashboardPathForRole(user?.role), { replace: true });
       } else {
         setError(data.message || 'Login failed.');
       }
@@ -61,17 +103,17 @@ export default function LoginPage() {
           <h3 className="role-header">Are you a</h3>
 
           <div className="role-row">
-            {ROLES.slice(0, 2).map((role) => (
+            {ROLE_OPTIONS.slice(0, 2).map((role) => (
               <button
                 type="button"
-                key={role}
+                key={role.value}
                 onClick={() => {
                   setError('');
-                  setSelectedRole(role);
+                  setSelectedRole(role.value);
                 }}
-                className={`role-btn ${selectedRole === role ? 'role-btn--active' : ''}`}
+                className={`role-btn ${selectedRole === role.value ? 'role-btn--active' : ''}`}
               >
-                {role}
+                {role.label}
               </button>
             ))}
           </div>
@@ -81,11 +123,11 @@ export default function LoginPage() {
               type="button"
               onClick={() => {
                 setError('');
-                setSelectedRole(ROLES[2]);
+                setSelectedRole(ROLE_OPTIONS[2].value);
               }}
-              className={`role-btn ${selectedRole === ROLES[2] ? 'role-btn--active' : ''}`}
+              className={`role-btn ${selectedRole === ROLE_OPTIONS[2].value ? 'role-btn--active' : ''}`}
             >
-              {ROLES[2]}
+              {ROLE_OPTIONS[2].label}
             </button>
           </div>
 
