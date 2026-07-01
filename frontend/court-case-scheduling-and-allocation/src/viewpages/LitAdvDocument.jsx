@@ -4,11 +4,7 @@ import { getStoredAuthToken } from '../utils/auth';
 import LitigantPageShell, { LITIGANT_THEME } from '../components/LitigantPageShell';
 
 const sidebarItems = [
-  { key: 'all', label: 'All documents' },
   { key: 'upload', label: 'Upload document' },
-  { key: 'pleading', label: 'Pleadings' },
-  { key: 'evidence', label: 'Evidence' },
-  { key: 'affidavit', label: 'Affidavits' },
 ];
 
 const DOCUMENT_TYPES = ['Pleading', 'Evidence', 'Affidavit', 'Motion', 'Order', 'Ruling', 'Other'];
@@ -98,13 +94,9 @@ export default function LitAdvDocument() {
         doc.caseTitle.toLowerCase().includes(term) ||
         doc.documentName.toLowerCase().includes(term);
 
-      if (activeSidebar === 'all' || activeSidebar === 'upload') {
-        return sameMonth && matchesSearch;
-      }
-
-      return sameMonth && matchesSearch && doc.documentType.toLowerCase() === activeSidebar;
+      return sameMonth && matchesSearch;
     });
-  }, [documents, monthFilter, searchTerm, activeSidebar]);
+  }, [documents, monthFilter, searchTerm]);
 
   const docsByCase = useMemo(() => {
     const grouped = new Map();

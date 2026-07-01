@@ -166,6 +166,39 @@ const approveHearing = async (req, res) => {
   }
 };
 
+// PATCH /api/hearings/:id/reject  (admin)
+const rejectHearing = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+
+    const notesSuffix = reason ? ` Rejection reason: ${String(reason).trim()}` : '';
+
+    const result = await pool.query(
+      `UPDATE hearings
+       SET status = 'cancelled',
+           hearing_notes = COALESCE(hearing_notes, '') || $1,
+           updated_at = NOW()
+       WHERE hearing_id = $2
+       RETURNING *`,
+      [notesSuffix, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hearing not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hearing request rejected.',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('rejectHearing error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
 // PATCH /api/hearings/assignments/:assignmentId/respond  (judge)
 const respondToAssignment = async (req, res) => {
   try {
@@ -264,5 +297,5 @@ const getHearingById = async (req, res) => {
 
 module.exports = {
   requestHearing, getHearings, createHearing, updateHearingStatus,
-  approveHearing, respondToAssignment, reassignJudge, getHearingById
+  approveHearing, rejectHearing, respondToAssignment, reassignJudge, getHearingById
 };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import ProfileMenu from '../components/ProfileMenu';
 import { getStoredAuthToken } from '../utils/auth';
 
 const navItems = ['Dashboard', 'Cases', 'Schedule', 'Documents'];
@@ -22,12 +23,20 @@ const toMonthKey = (value) => {
 
 export default function JudgeDocument() {
 	const navigate = useNavigate();
+	const [isNarrowScreen, setIsNarrowScreen] = useState(() => window.innerWidth < 980);
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [activeNav, setActiveNav] = useState('Documents');
 	const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
 	const [searchTerm, setSearchTerm] = useState('');
 	const [documents, setDocuments] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [fetchError, setFetchError] = useState('');
+
+	useEffect(() => {
+		const onResize = () => setIsNarrowScreen(window.innerWidth < 980);
+		window.addEventListener('resize', onResize);
+		return () => window.removeEventListener('resize', onResize);
+	}, []);
 
 	useEffect(() => {
 		const token = getStoredAuthToken();
@@ -119,78 +128,114 @@ export default function JudgeDocument() {
 					backgroundColor: THEME.navPrimary,
 					display: 'flex',
 					alignItems: 'center',
-					justifyContent: 'center',
-					gap: '12px',
-					padding: '0 24px',
-					height: '60px',
+					justifyContent: 'space-between',
+					gap: '10px',
+					padding: isNarrowScreen ? '8px 12px' : '0 24px',
+					minHeight: '60px',
 				}}
 			>
-				{navItems.map((item) => (
-					<button
-						key={item}
-						onClick={() => {
-							setActiveNav(item);
-							if (item === 'Dashboard') navigate('/dashboard/judge');
-							if (item === 'Cases') navigate('/dashboard/judge/cases');
-							if (item === 'Schedule') navigate('/dashboard/judge/schedule');
-							if (item === 'Documents') navigate('/dashboard/judge/documents');
-						}}
-						style={{
-							background: activeNav === item ? THEME.accent : 'transparent',
-							color: activeNav === item ? '#fff' : THEME.navText,
-							border: 'none',
-							borderRadius: '6px',
-							padding: '8px 22px',
-							fontSize: '14px',
-							fontWeight: activeNav === item ? 600 : 400,
-							cursor: 'pointer',
-						}}
-					>
-						{item}
-					</button>
-				))}
-			</nav>
-
-			<div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-				<aside
+				<button
+					onClick={() => setIsSidebarOpen(true)}
 					style={{
-						width: '190px',
-						backgroundColor: THEME.panel,
-						borderRight: `1px solid ${THEME.border}`,
-						padding: '20px 0',
+						border: `1px solid ${THEME.border}`,
+						borderRadius: '8px',
+						backgroundColor: '#fff',
+						color: THEME.accent,
+						fontSize: '13px',
+						fontWeight: 700,
+						padding: '7px 10px',
+						cursor: 'pointer',
 						flexShrink: 0,
 					}}
 				>
-					<p
+					☰
+				</button>
+
+				<div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', flex: 1, minWidth: 0 }}>
+					{navItems.map((item) => (
+						<button
+							key={item}
+							onClick={() => {
+								setActiveNav(item);
+								if (item === 'Dashboard') navigate('/dashboard/judge');
+								if (item === 'Cases') navigate('/dashboard/judge/cases');
+								if (item === 'Schedule') navigate('/dashboard/judge/schedule');
+								if (item === 'Documents') navigate('/dashboard/judge/documents');
+							}}
+							style={{
+								background: activeNav === item ? THEME.accent : 'transparent',
+								color: activeNav === item ? '#fff' : THEME.navText,
+								border: 'none',
+								borderRadius: '6px',
+								padding: isNarrowScreen ? '8px 14px' : '8px 22px',
+								fontSize: '14px',
+								fontWeight: activeNav === item ? 600 : 400,
+								cursor: 'pointer',
+								whiteSpace: 'nowrap',
+								flexShrink: 0,
+							}}
+						>
+							{item}
+						</button>
+					))}
+				</div>
+
+				<div style={{ flexShrink: 0 }}>
+					<ProfileMenu accentColor={THEME.accent} borderColor={THEME.border} />
+				</div>
+			</nav>
+
+			{isSidebarOpen && (
+				<>
+					<div onClick={() => setIsSidebarOpen(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.35)', zIndex: 29 }} />
+					<aside
 						style={{
-							fontSize: '12px',
-							fontWeight: 700,
-							color: THEME.accent,
-							padding: '6px 20px 4px',
-							letterSpacing: '0.04em',
-							textTransform: 'uppercase',
+							position: 'fixed',
+							top: 0,
+							left: 0,
+							bottom: 0,
+							width: isNarrowScreen ? '78%' : '260px',
+							maxWidth: '320px',
+							backgroundColor: THEME.panel,
+							borderRight: `1px solid ${THEME.border}`,
+							padding: '14px 0',
+							zIndex: 30,
+							overflowY: 'auto',
 						}}
 					>
-						Documents
-					</p>
-					<div style={{ padding: '8px 20px' }}>
-						<label style={{ display: 'block', fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>Month</label>
-						<input
-							type="month"
-							value={monthFilter}
-							onChange={(e) => setMonthFilter(e.target.value)}
-							style={{
-								width: '100%',
-								padding: '8px',
-								border: `1px solid ${THEME.border}`,
-								borderRadius: '8px',
-								backgroundColor: '#fff',
-							}}
-						/>
-					</div>
-				</aside>
+						<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 14px 10px' }}>
+							<p style={{ fontSize: '12px', fontWeight: 700, color: THEME.accent, letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
+								Documents
+							</p>
+							<button
+								onClick={() => setIsSidebarOpen(false)}
+								style={{ border: 'none', background: 'transparent', color: THEME.accent, fontSize: '18px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+								aria-label="Close sidebar"
+							>
+								←
+							</button>
+						</div>
+						<div style={{ padding: '8px 20px' }}>
+							<label style={{ display: 'block', fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>Month</label>
+							<input
+								type="month"
+								value={monthFilter}
+								onChange={(e) => setMonthFilter(e.target.value)}
+								style={{
+									width: '100%',
+									padding: '8px',
+									border: `1px solid ${THEME.border}`,
+									borderRadius: '8px',
+									backgroundColor: '#fff',
+								}}
+							/>
+						</div>
+					</aside>
+				</>
+			)}
 
-				<main style={{ flex: 1, padding: '28px 32px' }}>
+			<div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
+				<main style={{ flex: 1, padding: isNarrowScreen ? '16px' : '28px 32px', minWidth: 0 }}>
 					<h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>Monthly Documents Outlook</h2>
 					<p style={{ color: '#64748B', marginTop: 0, marginBottom: '16px' }}>
 						Documents are grouped by the case they are attached to.

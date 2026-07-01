@@ -32,6 +32,7 @@ router.get('/dashboard/judges', authenticate, authorize('admin'), dashboardContr
 // ─── CASES ────────────────────────────────────────────────────
 router.post('/cases', authenticate, authorize('litigant', 'advocate'), casesController.createCase);
 router.get('/cases', authenticate, casesController.getCases);
+router.get('/cases/categories', authenticate, casesController.getCaseCategories);
 router.get('/cases/:id', authenticate, casesController.getCaseById);
 router.patch('/cases/:id/status', authenticate, authorize('admin'), casesController.updateCaseStatus);
 router.patch('/cases/:id/register', authenticate, authorize('admin'), casesController.registerCase);
@@ -43,6 +44,7 @@ router.get('/hearings/:id', authenticate, hearingsController.getHearingById);
 router.post('/hearings', authenticate, authorize('litigant', 'advocate'), hearingsController.createHearing); // compatibility
 router.patch('/hearings/:id/status', authenticate, authorize('admin'), hearingsController.updateHearingStatus);
 router.patch('/hearings/:id/approve', authenticate, authorize('admin'), hearingsController.approveHearing);
+router.patch('/hearings/:id/reject', authenticate, authorize('admin'), hearingsController.rejectHearing);
 router.patch('/hearings/:hearingId/reassign', authenticate, authorize('admin'), hearingsController.reassignJudge);
 router.patch('/hearings/assignments/:assignmentId/respond', authenticate, authorize('judge'), hearingsController.respondToAssignment);
 

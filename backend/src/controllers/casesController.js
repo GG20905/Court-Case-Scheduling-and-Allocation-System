@@ -81,9 +81,30 @@ const getCases = async (req, res) => {
   }
 };
 
+// GET /api/cases/categories
+const getCaseCategories = async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT TRIM(case_category) AS case_category
+       FROM cases
+       WHERE case_category IS NOT NULL AND TRIM(case_category) <> ''
+       ORDER BY case_category ASC`
+    );
+
+    return res.status(200).json({ success: true, count: result.rows.length, data: result.rows });
+  } catch (err) {
+    console.error('getCaseCategories error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
 // GET /api/cases/:id
 const getCaseById = async (req, res) => {
   try {
+    if (String(req.params.id || '').toLowerCase() === 'categories') {
+      return getCaseCategories(req, res);
+    }
+
     const parsedCaseId = parsePositiveIntId(req.params.id);
     if (!parsedCaseId) {
       return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
@@ -245,4 +266,4 @@ const registerCase = async (req, res) => {
   }
 };
 
-module.exports = { createCase, getCases, getCaseById, updateCaseStatus, registerCase };
+module.exports = { createCase, getCases, getCaseCategories, getCaseById, updateCaseStatus, registerCase };

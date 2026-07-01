@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import ProfileMenu from '../components/ProfileMenu';
 import { authFetchJson } from '../utils/api';
 
 const navItems = ['Dashboard', 'Cases', 'Schedule', 'Documents'];
@@ -37,12 +38,20 @@ const formatDate = (value) => {
 
 export default function JudgeCaseTab() {
   const navigate = useNavigate();
+  const [isNarrowScreen, setIsNarrowScreen] = useState(() => window.innerWidth < 980);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('Cases');
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [caseRows, setCaseRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
+
+  useEffect(() => {
+    const onResize = () => setIsNarrowScreen(window.innerWidth < 980);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -117,92 +126,131 @@ export default function JudgeCaseTab() {
           backgroundColor: THEME.navPrimary,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          padding: '0 24px',
+          justifyContent: 'space-between',
+          gap: '10px',
+          padding: isNarrowScreen ? '8px 12px' : '0 24px',
           position: 'relative',
-          height: '60px',
+          minHeight: '60px',
         }}
       >
-        {navItems.map((item) => (
-          <button
-            key={item}
-            onClick={() => {
-              setActiveNav(item);
-              if (item === 'Dashboard') navigate('/dashboard/judge');
-              if (item === 'Cases') navigate('/dashboard/judge/cases');
-              if (item === 'Schedule') navigate('/dashboard/judge/schedule');
-              if (item === 'Documents') navigate('/dashboard/judge/documents');
-            }}
-            style={{
-              background: activeNav === item ? THEME.accent : 'transparent',
-              color: activeNav === item ? '#fff' : THEME.navText,
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 22px',
-              fontSize: '14px',
-              fontWeight: activeNav === item ? 600 : 400,
-              cursor: 'pointer',
-            }}
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
-
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-        <aside
+        <button
+          onClick={() => setIsSidebarOpen(true)}
           style={{
-            width: '190px',
-            backgroundColor: THEME.panel,
-            borderRight: `1px solid ${THEME.border}`,
-            padding: '20px 0',
+            border: `1px solid ${THEME.border}`,
+            borderRadius: '8px',
+            backgroundColor: '#fff',
+            color: THEME.accent,
+            fontSize: '13px',
+            fontWeight: 700,
+            padding: '7px 10px',
+            cursor: 'pointer',
             flexShrink: 0,
           }}
         >
-          <p
-            style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: THEME.accent,
-              padding: '6px 20px 4px',
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Cases
-          </p>
+          ☰
+        </button>
 
-          {[
-            { key: 'all', label: 'All cases' },
-            { key: 'urgent', label: 'Urgent cases' },
-            { key: 'delayed', label: 'Delayed cases' },
-            { key: 'concluded', label: 'Concluded cases' },
-          ].map((item) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', flex: 1, minWidth: 0 }}>
+          {navItems.map((item) => (
             <button
-              key={item.key}
-              onClick={() => setActiveFilter(item.key)}
+              key={item}
+              onClick={() => {
+                setActiveNav(item);
+                if (item === 'Dashboard') navigate('/dashboard/judge');
+                if (item === 'Cases') navigate('/dashboard/judge/cases');
+                if (item === 'Schedule') navigate('/dashboard/judge/schedule');
+                if (item === 'Documents') navigate('/dashboard/judge/documents');
+              }}
               style={{
-                display: 'block',
-                width: '100%',
-                background: 'transparent',
+                background: activeNav === item ? THEME.accent : 'transparent',
+                color: activeNav === item ? '#fff' : THEME.navText,
                 border: 'none',
-                textAlign: 'left',
-                padding: '9px 20px',
-                fontSize: '13.5px',
-                color: activeFilter === item.key ? THEME.accent : '#475569',
-                fontWeight: activeFilter === item.key ? 600 : 400,
+                borderRadius: '6px',
+                padding: isNarrowScreen ? '8px 14px' : '8px 22px',
+                fontSize: '14px',
+                fontWeight: activeNav === item ? 600 : 400,
                 cursor: 'pointer',
-                backgroundColor: activeFilter === item.key ? '#deeaf7' : 'transparent',
-                borderLeft: activeFilter === item.key ? `3px solid ${THEME.accent}` : '3px solid transparent',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
-              {item.label}
+              {item}
             </button>
           ))}
-        </aside>
+        </div>
 
-        <main style={{ flex: 1, padding: '28px 32px' }}>
+        <div style={{ flexShrink: 0 }}>
+          <ProfileMenu accentColor={THEME.accent} borderColor={THEME.border} />
+        </div>
+      </nav>
+
+      {isSidebarOpen && (
+        <>
+          <div onClick={() => setIsSidebarOpen(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.35)', zIndex: 29 }} />
+          <aside
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: isNarrowScreen ? '78%' : '260px',
+              maxWidth: '320px',
+              backgroundColor: THEME.panel,
+              borderRight: `1px solid ${THEME.border}`,
+              padding: '14px 0',
+              zIndex: 30,
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 14px 10px' }}>
+              <p style={{ fontSize: '12px', fontWeight: 700, color: THEME.accent, letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
+                Cases
+              </p>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                style={{ border: 'none', background: 'transparent', color: THEME.accent, fontSize: '18px', fontWeight: 700, cursor: 'pointer', lineHeight: 1 }}
+                aria-label="Close sidebar"
+              >
+                ←
+              </button>
+            </div>
+
+            {[
+              { key: 'all', label: 'All cases' },
+              { key: 'urgent', label: 'Urgent cases' },
+              { key: 'delayed', label: 'Delayed cases' },
+              { key: 'concluded', label: 'Concluded cases' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setActiveFilter(item.key);
+                  setIsSidebarOpen(false);
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  padding: '9px 20px',
+                  fontSize: '13.5px',
+                  color: activeFilter === item.key ? THEME.accent : '#475569',
+                  fontWeight: activeFilter === item.key ? 600 : 400,
+                  cursor: 'pointer',
+                  backgroundColor: activeFilter === item.key ? '#deeaf7' : 'transparent',
+                  borderLeft: activeFilter === item.key ? `3px solid ${THEME.accent}` : '3px solid transparent',
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </aside>
+        </>
+      )}
+
+      <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
+        <main style={{ flex: 1, padding: isNarrowScreen ? '16px' : '28px 32px', minWidth: 0 }}>
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Judge Cases</h2>
 
           {fetchError && (

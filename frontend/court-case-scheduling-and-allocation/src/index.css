@@ -10,6 +10,20 @@ body {
   background-color: #f5f7fc;
   min-height: 100vh;
 }
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+}
  
 /* ── Navbar ─────────────────────────────────── */
 .navbar {
@@ -21,9 +35,10 @@ body {
 
 .navbar-inner {
   min-height: 78px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -54,6 +69,24 @@ body {
   color: #d2ddff;
   margin: 0;
   font-weight: 500;
+}
+
+/* ── Global Footer ─────────────────────────── */
+.global-footer {
+  min-height: 34px;
+  background-color: #0d1652;
+  border-top: 1px solid #1a3a8c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+}
+
+.global-footer-text {
+  margin: 0;
+  font-size: 12px;
+  color: #d2ddff;
+  text-align: center;
 }
  
 /* ── Page layout ────────────────────────────── */
