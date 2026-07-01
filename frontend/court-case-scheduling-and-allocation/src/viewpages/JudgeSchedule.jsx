@@ -15,7 +15,7 @@ const THEME = {
   border: '#a8bfe0',
 };
 
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const calendarWeekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const statusColor = (status) => {
   const normalized = String(status || '').toLowerCase();
@@ -44,12 +44,33 @@ const monthKey = (dateValue) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
 
+const parseAsLocalDate = (value) => {
+  if (!value) return null;
+
+  // Keep YYYY-MM-DD values in local time to avoid UTC date shifts.
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const fullDateKey = (dateValue) => {
+  const date = parseAsLocalDate(dateValue);
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 export default function JudgeSchedule() {
   const navigate = useNavigate();
   const [isNarrowScreen, setIsNarrowScreen] = useState(() => window.innerWidth < 980);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('Schedule');
-  const [view, setView] = useState('weekly');
+  const [view, setView] = useState('monthly');
+  const [now, setNow] = useState(new Date());
   const [hearings, setHearings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
@@ -91,15 +112,45 @@ export default function JudgeSchedule() {
     loadHearings();
   }, []);
 
-  const grouped = useMemo(() => {
-    return days.map((day) => ({ day, items: hearings.filter((h) => h.day === day) }));
-  }, [hearings]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const activeMonthCount = useMemo(() => {
     if (!hearings.length) return 0;
     const currentMonth = new Date().toISOString().slice(0, 7);
     return hearings.filter((h) => monthKey(h.hearingDateRaw) === currentMonth).length;
   }, [hearings]);
+
+  const monthlyCalendar = useMemo(() => {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const startOffset = firstDay.getDay();
+    const startDate = new Date(year, month, 1 - startOffset);
+
+    const hearingsByDate = new Map();
+    for (const item of hearings) {
+      const key = fullDateKey(item.hearingDateRaw);
+      if (!key) continue;
+      if (!hearingsByDate.has(key)) hearingsByDate.set(key, []);
+      hearingsByDate.get(key).push(item);
+    }
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + index);
+      const key = fullDateKey(cellDate);
+      return {
+        key,
+        date: cellDate,
+        inCurrentMonth: cellDate.getMonth() === month,
+        hearings: hearingsByDate.get(key) || [],
+      };
+    });
+  }, [hearings, now]);
 
   return (
     <div style={{ fontFamily: "'Segoe UI', sans-serif", minHeight: '100vh', backgroundColor: THEME.pageBg }}>
@@ -199,7 +250,6 @@ export default function JudgeSchedule() {
             </div>
 
             {[
-              { key: 'weekly', label: 'Weekly view' },
               { key: 'monthly', label: 'Monthly view' },
               { key: 'all', label: 'All hearings' },
             ].map((item) => (
@@ -247,48 +297,48 @@ export default function JudgeSchedule() {
             </div>
           )}
 
-          {!isLoading && view === 'weekly' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
-              {grouped.map((col) => (
-                <div
-                  key={col.day}
-                  style={{
-                    backgroundColor: '#fff',
-                    border: `1px solid ${THEME.border}`,
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div style={{ backgroundColor: THEME.panel, padding: '10px 12px', fontWeight: 700, color: '#334155' }}>{col.day}</div>
-                  <div style={{ padding: '10px' }}>
-                    {col.items.length === 0 && <p style={{ color: '#64748B', fontSize: '12px' }}>No hearings</p>}
-                    {col.items.map((h) => (
-                      <div
-                        key={h.id + h.time}
-                        style={{
-                          border: `1px solid ${THEME.border}`,
-                          borderLeft: `4px solid ${statusColor(h.status)}`,
-                          borderRadius: '8px',
-                          padding: '8px 10px',
-                          marginBottom: '8px',
-                          backgroundColor: '#fff',
-                        }}
-                      >
-                        <p style={{ margin: 0, fontSize: '12px', color: '#334155', fontWeight: 700 }}>{h.time} · {h.id}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#475569' }}>{h.title}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: statusColor(h.status), fontWeight: 700 }}>{h.status}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {!isLoading && view === 'monthly' && (
-            <div style={{ backgroundColor: '#fff', border: `1px solid ${THEME.border}`, borderRadius: '10px', padding: '20px' }}>
-              <p style={{ margin: 0, color: '#334155', fontWeight: 600 }}>Monthly summary</p>
-              <p style={{ marginTop: '8px', color: '#64748B' }}>You have {activeMonthCount} hearings in the current month.</p>
+            <div style={{ backgroundColor: '#fff', border: `1px solid ${THEME.border}`, borderRadius: '10px', padding: '12px', maxWidth: '1040px', margin: '0 auto' }}>
+              <p style={{ margin: '0 0 2px', color: '#334155', fontWeight: 700 }}>
+                {now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              </p>
+              <p style={{ margin: '0 0 10px', color: '#64748B', fontSize: '12px' }}>
+                Today: {now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+              <p style={{ margin: '0 0 12px', color: '#64748B', fontSize: '13px' }}>You have {activeMonthCount} hearings in the current month.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                {calendarWeekDays.map((dayName) => (
+                  <div key={dayName} style={{ textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#475569', padding: '4px 0' }}>
+                    {dayName}
+                  </div>
+                ))}
+                {monthlyCalendar.map((cell) => {
+                  const isToday = fullDateKey(cell.date) === fullDateKey(now);
+                  return (
+                    <div
+                      key={cell.key}
+                      style={{
+                        minHeight: '68px',
+                        border: isToday ? `2px solid ${THEME.accent}` : `1px solid ${THEME.border}`,
+                        borderRadius: '8px',
+                        padding: '4px',
+                        backgroundColor: cell.inCurrentMonth ? '#fff' : '#F8FAFC',
+                        opacity: cell.inCurrentMonth ? 1 : 0.7,
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: isToday ? THEME.accent : '#334155' }}>{cell.date.getDate()}</p>
+                      {cell.hearings.slice(0, 2).map((h) => (
+                        <p key={`${cell.key}-${h.id}-${h.time}`} style={{ margin: '3px 0 0', fontSize: '10px', color: statusColor(h.status), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {h.time} {h.id}
+                        </p>
+                      ))}
+                      {cell.hearings.length > 2 && (
+                        <p style={{ margin: '3px 0 0', fontSize: '10px', color: '#64748B' }}>+{cell.hearings.length - 2} more</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

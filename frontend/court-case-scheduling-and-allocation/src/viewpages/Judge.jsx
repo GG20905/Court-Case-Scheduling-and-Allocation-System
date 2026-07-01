@@ -259,8 +259,6 @@ export default function Judge() {
             {[
               { title: 'Total cases', value: stats.totalCases },
               { title: 'Hearings today', value: stats.hearingsToday },
-              { title: 'Delayed cases', value: stats.delayedCases },
-              { title: 'Concluded cases', value: stats.concludedCases },
               { title: 'Urgent cases', value: stats.urgentCases },
             ].map((card) => (
               <div
@@ -279,7 +277,7 @@ export default function Judge() {
             ))}
           </section>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', width: '100%' }}>
             <section
               style={{
                 backgroundColor: '#fff',
@@ -302,27 +300,6 @@ export default function Judge() {
               </div>
             </section>
 
-            <section
-              style={{
-                backgroundColor: '#fff',
-                border: `1px solid ${THEME.border}`,
-                borderRadius: '10px',
-                padding: '14px',
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '15px', color: '#1E2A45' }}>Today Hearings</h3>
-              <div style={{ marginTop: '10px' }}>
-                {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading hearings...</p>}
-                {!isLoading && todaysHearings.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No hearings for today.</p>}
-                {!isLoading && todaysHearings.map((item) => (
-                  <div key={item.id + item.time} style={{ padding: '10px 0', borderBottom: '1px solid #EEF2F7' }}>
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: THEME.accent }}>{item.time}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#334155' }}>{item.id}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748B' }}>{item.title}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
         </main>
       </div>

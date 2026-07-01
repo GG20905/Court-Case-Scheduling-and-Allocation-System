@@ -55,7 +55,12 @@ const getHearings = async (req, res) => {
         FROM hearings h
         JOIN cases c ON h.case_id = c.case_id
         LEFT JOIN judges j ON h.judge_id = j.judge_id
-        ORDER BY h.hearing_date ASC`;
+        ORDER BY
+          CASE WHEN h.status = 'requested' THEN 0 ELSE 1 END,
+          CASE WHEN h.status = 'requested' THEN h.created_at END ASC,
+          h.hearing_date ASC,
+          h.hearing_time ASC,
+          h.created_at ASC`;
     } else if (req.user.role === 'judge') {
       const jResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
       query = `

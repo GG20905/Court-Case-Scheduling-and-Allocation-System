@@ -20,6 +20,7 @@ export default function AdminJudgeDashboard() {
   const [cases, setCases] = useState([]);
   const [hearings, setHearings] = useState([]);
   const [judges, setJudges] = useState([]);
+  const [assignmentResponses, setAssignmentResponses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
 
@@ -28,17 +29,19 @@ export default function AdminJudgeDashboard() {
       setIsLoading(true);
       setFetchError('');
       try {
-        const [summaryRes, casesRes, hearingsRes, judgesRes] = await Promise.all([
+        const [summaryRes, casesRes, hearingsRes, judgesRes, responsesRes] = await Promise.all([
           authFetchJson('/api/dashboard/summary'),
           authFetchJson('/api/cases'),
           authFetchJson('/api/hearings'),
           authFetchJson('/api/dashboard/judges'),
+          authFetchJson('/api/dashboard/assignment-responses'),
         ]);
 
         setSummary(summaryRes.data || null);
         setCases(Array.isArray(casesRes.data) ? casesRes.data : []);
         setHearings(Array.isArray(hearingsRes.data) ? hearingsRes.data : []);
         setJudges(Array.isArray(judgesRes.data) ? judgesRes.data : []);
+        setAssignmentResponses(Array.isArray(responsesRes.data) ? responsesRes.data : []);
       } catch (error) {
         setFetchError(error.message || 'Failed to load admin dashboard.');
       } finally {
@@ -154,6 +157,37 @@ export default function AdminJudgeDashboard() {
           </div>
         </section>
       </div>
+
+      <section style={{ marginTop: '12px', backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '14px' }}>
+        <h3 style={{ margin: 0, fontSize: '15px', color: '#1E2A45' }}>Judge Assignment Responses</h3>
+        <div style={{ marginTop: '10px' }}>
+          {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading responses...</p>}
+          {!isLoading && assignmentResponses.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No judge responses yet.</p>}
+          {!isLoading && assignmentResponses.map((item) => {
+            const state = String(item.assignment_status || '').toLowerCase();
+            const stateColor = state === 'approved' ? '#15803D' : '#B91C1C';
+            const label = state === 'approved' ? 'accepted' : 'rejected';
+            return (
+              <div key={item.assignment_id} style={{ padding: '10px 0', borderBottom: '1px solid #EEF2F7' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#334155' }}>
+                  <span style={{ fontWeight: 700 }}>{item.judge_name || 'Judge'}</span>{' '}
+                  <span style={{ color: stateColor, fontWeight: 700 }}>{label}</span>{' '}
+                  assignment for{' '}
+                  <span style={{ fontWeight: 700, color: ADMIN_THEME.accent }}>CASE-{item.case_id}</span>
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748B' }}>
+                  {item.case_title || 'Untitled case'} · {formatDate(item.updated_at || item.assignment_date)}
+                </p>
+                {state === 'rejected' && item.rejection_reason && (
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#B91C1C' }}>
+                    Reason: {item.rejection_reason}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section style={{ marginTop: '12px', backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '14px' }}>
         <h3 style={{ margin: 0, fontSize: '15px', color: '#1E2A45' }}>Judge Workload</h3>

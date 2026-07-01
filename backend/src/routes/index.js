@@ -28,6 +28,7 @@ router.post('/users', usersController.createUser); // kept for compatibility
 // ─── DASHBOARD ────────────────────────────────────────────────
 router.get('/dashboard/summary', authenticate, authorize('admin'), dashboardController.getSummary);
 router.get('/dashboard/judges', authenticate, authorize('admin'), dashboardController.getJudges);
+router.get('/dashboard/assignment-responses', authenticate, authorize('admin'), dashboardController.getRecentAssignmentResponses);
 
 // ─── CASES ────────────────────────────────────────────────────
 router.post('/cases', authenticate, authorize('litigant', 'advocate'), casesController.createCase);
@@ -51,6 +52,7 @@ router.patch('/hearings/assignments/:assignmentId/respond', authenticate, author
 // ─── DOCUMENTS ────────────────────────────────────────────────
 router.post('/cases/:caseId/documents', authenticate, authorize('litigant', 'advocate'), upload.single('document'), documentsController.createDocument);
 router.get('/cases/:caseId/documents', authenticate, documentsController.getDocumentsByCase);
+router.patch('/documents/:id/share', authenticate, authorize('admin'), documentsController.shareDocumentToDesignatedJudge);
 router.get('/documents/:id/download', authenticate, documentsController.downloadDocument);
 router.delete('/documents/:id', authenticate, documentsController.deleteDocument);
 

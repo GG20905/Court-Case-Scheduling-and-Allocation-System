@@ -88,6 +88,7 @@ export default function CourtadminSchedule() {
         judge: item.judge_name || 'Not assigned',
         status: item.status || 'requested',
         rawDate: item.hearing_date,
+        createdAt: item.created_at,
       }));
 
       setHearings(mappedHearings);
@@ -229,7 +230,9 @@ export default function CourtadminSchedule() {
   }, [hearings, now]);
 
   const pendingRequests = useMemo(
-    () => hearings.filter((h) => String(h.status || '').toLowerCase() === 'requested'),
+    () => hearings
+      .filter((h) => String(h.status || '').toLowerCase() === 'requested')
+      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()),
     [hearings]
   );
 

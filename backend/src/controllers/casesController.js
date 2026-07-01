@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 
 const VALID_CASE_STATUSES = ['pending', 'active', 'scheduled', 'closed', 'dismissed'];
-const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const VALID_PRIORITIES = ['normal', 'high', 'urgent'];
 
 const parsePositiveIntId = (value) => {
   const id = Number(value);
@@ -62,10 +62,14 @@ const getCases = async (req, res) => {
     } else if (req.user.role === 'judge') {
       const judgeResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
       query = `
-        SELECT c.*, ja.assignment_status
+        SELECT DISTINCT ON (c.case_id)
+          c.*, ja.assignment_id, ja.assignment_status,
+          ja.assignment_date, ja.updated_at AS assignment_updated_at,
+          ja.rejection_reason
         FROM cases c
         INNER JOIN judge_assignments ja ON c.case_id = ja.case_id
-        WHERE ja.judge_id = $1 ORDER BY c.created_at DESC`;
+        WHERE ja.judge_id = $1
+        ORDER BY c.case_id, ja.updated_at DESC, ja.assignment_id DESC`;
       params = [judgeResult.rows[0].judge_id];
     } else {
       const pResult = await pool.query('SELECT participant_id FROM litigants_advocates WHERE user_id = $1', [req.user.user_id]);
@@ -248,7 +252,7 @@ const registerCase = async (req, res) => {
     const result = await pool.query(
       `UPDATE cases SET
         case_status = COALESCE($1, 'active'),
-        priority = COALESCE($2, 'normal'),
+        priority = COALESCE($2, priority),
         admin_id = $3,
         updated_at = NOW()
        WHERE case_id = $4 RETURNING *`,
