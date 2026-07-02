@@ -56,4 +56,31 @@ const getJudges = async (req, res) => {
   }
 };
 
-module.exports = { getSummary, getJudges };
+const getRecentAssignmentResponses = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+        ja.assignment_id,
+        ja.assignment_status,
+        ja.rejection_reason,
+        ja.updated_at,
+        ja.assignment_date,
+        ja.case_id,
+        c.case_title,
+        j.full_name AS judge_name
+       FROM judge_assignments ja
+       INNER JOIN cases c ON c.case_id = ja.case_id
+       INNER JOIN judges j ON j.judge_id = ja.judge_id
+       WHERE ja.assignment_status IN ('approved', 'rejected')
+       ORDER BY ja.updated_at DESC, ja.assignment_id DESC
+       LIMIT 15`
+    );
+
+    return res.status(200).json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('getRecentAssignmentResponses error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+module.exports = { getSummary, getJudges, getRecentAssignmentResponses };

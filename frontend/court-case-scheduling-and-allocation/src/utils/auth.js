@@ -27,6 +27,11 @@ export const persistAuthSession = ({ token, user }) => {
 
 export const getStoredAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || '';
 
+export const clearAuthSession = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+};
+
 export const getStoredAuthUser = () => {
   try {
     const raw = localStorage.getItem(AUTH_USER_KEY);

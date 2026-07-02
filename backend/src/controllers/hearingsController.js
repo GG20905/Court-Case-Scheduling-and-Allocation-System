@@ -55,7 +55,12 @@ const getHearings = async (req, res) => {
         FROM hearings h
         JOIN cases c ON h.case_id = c.case_id
         LEFT JOIN judges j ON h.judge_id = j.judge_id
-        ORDER BY h.hearing_date ASC`;
+        ORDER BY
+          CASE WHEN h.status = 'requested' THEN 0 ELSE 1 END,
+          CASE WHEN h.status = 'requested' THEN h.created_at END ASC,
+          h.hearing_date ASC,
+          h.hearing_time ASC,
+          h.created_at ASC`;
     } else if (req.user.role === 'judge') {
       const jResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
       query = `
@@ -166,6 +171,39 @@ const approveHearing = async (req, res) => {
   }
 };
 
+// PATCH /api/hearings/:id/reject  (admin)
+const rejectHearing = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+
+    const notesSuffix = reason ? ` Rejection reason: ${String(reason).trim()}` : '';
+
+    const result = await pool.query(
+      `UPDATE hearings
+       SET status = 'cancelled',
+           hearing_notes = COALESCE(hearing_notes, '') || $1,
+           updated_at = NOW()
+       WHERE hearing_id = $2
+       RETURNING *`,
+      [notesSuffix, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hearing not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Hearing request rejected.',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('rejectHearing error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
 // PATCH /api/hearings/assignments/:assignmentId/respond  (judge)
 const respondToAssignment = async (req, res) => {
   try {
@@ -264,5 +302,5 @@ const getHearingById = async (req, res) => {
 
 module.exports = {
   requestHearing, getHearings, createHearing, updateHearingStatus,
-  approveHearing, respondToAssignment, reassignJudge, getHearingById
+  approveHearing, rejectHearing, respondToAssignment, reassignJudge, getHearingById
 };
