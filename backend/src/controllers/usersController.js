@@ -3,7 +3,19 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-const isBrevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
+const getBrevoConfigStatus = () => {
+  const hasApiKey = Boolean(String(process.env.BREVO_API_KEY || '').trim());
+  const hasFromEmail = Boolean(String(process.env.BREVO_FROM_EMAIL || '').trim());
+
+  return {
+    isConfigured: hasApiKey && hasFromEmail,
+    missing: [
+      ...(hasApiKey ? [] : ['BREVO_API_KEY']),
+      ...(hasFromEmail ? [] : ['BREVO_FROM_EMAIL']),
+    ],
+  };
+};
+
 const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
 
@@ -114,7 +126,8 @@ const buildOtpMessage = (code) => ({
 });
 
 const sendViaBrevoApi = async (toEmail, code) => {
-  if (!isBrevoConfigured) {
+  const brevoConfig = getBrevoConfigStatus();
+  if (!brevoConfig.isConfigured) {
     throw new Error('Brevo API is not configured on the server.');
   }
 
@@ -147,33 +160,34 @@ const sendViaBrevoApi = async (toEmail, code) => {
 };
 
 const sendTwoFactorCodeEmail = async (toEmail, code) => {
-  const attempts = [];
+  const brevoConfig = getBrevoConfigStatus();
 
-  if (isBrevoConfigured) {
-    try {
-      await sendViaBrevoApi(toEmail, code);
-      return {
-        delivered: true,
-        provider: 'brevo',
-        reason: 'sent',
-        detail: '2FA code sent using Brevo API.',
-      };
-    } catch (err) {
-      console.error('2FA email delivery error (brevo):', err.message);
-      attempts.push(`brevo: ${err.message}`);
-    }
+  if (!brevoConfig.isConfigured) {
+    return {
+      delivered: false,
+      provider: 'none',
+      reason: 'provider_missing',
+      detail: `Missing email provider configuration: ${brevoConfig.missing.join(', ')}.`,
+    };
   }
 
-  if (!isBrevoConfigured) {
-    attempts.push('No email provider configured. Add Brevo credentials in backend/.env.');
+  try {
+    await sendViaBrevoApi(toEmail, code);
+    return {
+      delivered: true,
+      provider: 'brevo',
+      reason: 'sent',
+      detail: '2FA code sent using Brevo API.',
+    };
+  } catch (err) {
+    console.error('2FA email delivery error (brevo):', err.message);
+    return {
+      delivered: false,
+      provider: 'brevo',
+      reason: 'provider_failed',
+      detail: `brevo: ${err.message}`,
+    };
   }
-
-  return {
-    delivered: false,
-    provider: 'none',
-    reason: 'provider_failed_or_missing',
-    detail: attempts.join(' | '),
-  };
 };
 
 const issueAndSendTwoFactorCode = async (user) => {

@@ -1,5 +1,10 @@
 const { Pool } = require('pg');
-require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Support env files in both backend/.env and project-root/.env.
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -31,12 +36,15 @@ const initializeDatabase = async () => {
     console.log('✅ Connected to PostgreSQL database');
   } catch (err) {
     console.error('❌ Database connection error:', err.message);
-    process.exit(1);
+    console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
   } finally {
     client.release();
   }
 };
 
-initializeDatabase();
+initializeDatabase().catch((err) => {
+  console.error('❌ Database initialization failed:', err.message);
+  console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
+});
 
 module.exports = pool;
