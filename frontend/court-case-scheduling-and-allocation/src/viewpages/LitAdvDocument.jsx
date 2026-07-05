@@ -210,7 +210,7 @@ export default function LitAdvDocument() {
       activeSidebarKey={activeSidebar}
       onSidebarSelect={setActiveSidebar}
     >
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>My Documents</h2>
+          <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>My Documents</h2>
           <p style={{ color: '#64748B', marginTop: 0, marginBottom: '16px' }}>
             Upload and track case documents by month.
           </p>
@@ -234,8 +234,8 @@ export default function LitAdvDocument() {
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', marginBottom: '16px' }}>
-            <section style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '16px' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1E2A45' }}>Upload document</h3>
+            <section className="pegasus-block" style={{ borderRadius: '12px', padding: '16px' }}>
+              <h3 className="pegasus-section-title" style={{ margin: '0 0 12px', fontSize: '16px', color: '#1E2A45' }}>Upload document</h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#475569' }}>
@@ -318,8 +318,8 @@ export default function LitAdvDocument() {
               </button>
             </section>
 
-            <section style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '16px' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#1E2A45' }}>Recently uploaded</h3>
+            <section className="pegasus-block" style={{ borderRadius: '12px', padding: '16px' }}>
+              <h3 className="pegasus-section-title" style={{ margin: '0 0 12px', fontSize: '16px', color: '#1E2A45' }}>Recently uploaded</h3>
               {recentDocs.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No recent uploads.</p>}
               {recentDocs.map((doc) => (
                 <div key={doc.id} style={{ borderTop: '1px solid #E2E8F0', paddingTop: '10px', marginTop: '10px' }}>
@@ -348,25 +348,23 @@ export default function LitAdvDocument() {
           </div>
 
           {isLoading && (
-            <div style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+            <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
               <p style={{ margin: 0, color: '#64748B' }}>Loading documents...</p>
             </div>
           )}
 
           {!isLoading && docsByCase.length === 0 && (
-            <div style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+            <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
               <p style={{ margin: 0, color: '#64748B' }}>No documents found for this month/filter.</p>
             </div>
           )}
 
           {!isLoading && docsByCase.map((group) => (
             <div
+              className="pegasus-block"
               key={group.caseId}
               style={{
-                backgroundColor: '#fff',
-                border: `1px solid ${LITIGANT_THEME.border}`,
-                borderRadius: '10px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                borderRadius: '12px',
                 marginBottom: '14px',
                 overflow: 'hidden',
               }}
@@ -378,7 +376,7 @@ export default function LitAdvDocument() {
 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#F8FAFC' }}>
+                  <tr className="pegasus-table-head">
                     {['Document', 'Type', 'Uploaded by', 'Date', 'Actions'].map((header) => (
                       <th key={header} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', color: '#334155' }}>{header}</th>
                     ))}

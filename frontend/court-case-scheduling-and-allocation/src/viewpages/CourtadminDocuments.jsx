@@ -146,7 +146,7 @@ export default function CourtadminDocuments() {
       activeSidebarKey={activeSidebar}
       onSidebarSelect={setActiveSidebar}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>Admin Documents</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>Admin Documents</h2>
       <p style={{ color: '#64748B', marginTop: 0, marginBottom: '16px' }}>Documents are grouped by case for monthly review.</p>
 
       {fetchError && (
@@ -184,24 +184,23 @@ export default function CourtadminDocuments() {
       </div>
 
       {isLoading && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>Loading documents...</p>
         </div>
       )}
 
       {!isLoading && docsByCase.length === 0 && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>No documents found for this filter.</p>
         </div>
       )}
 
       {!isLoading && docsByCase.map((group) => (
         <div
+          className="pegasus-block"
           key={group.caseId}
           style={{
-            backgroundColor: '#fff',
-            border: `1px solid ${ADMIN_THEME.border}`,
-            borderRadius: '10px',
+            borderRadius: '12px',
             marginBottom: '14px',
             overflow: 'hidden',
           }}
@@ -213,7 +212,7 @@ export default function CourtadminDocuments() {
 
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#F8FAFC' }}>
+              <tr className="pegasus-table-head">
                 {['Document', 'Type', 'Uploaded by', 'Date', 'Shared with', 'Actions'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
                 ))}

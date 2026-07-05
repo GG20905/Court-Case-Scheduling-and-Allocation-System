@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AdminPageShell, { ADMIN_THEME } from '../components/AdminPageShell';
 import { authFetchJson } from '../utils/api';
 
@@ -24,6 +25,7 @@ const normalizePriority = (value) => {
 };
 
 export default function CourtadminCases() {
+  const [searchParams] = useSearchParams();
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [caseRows, setCaseRows] = useState([]);
@@ -55,6 +57,7 @@ export default function CourtadminCases() {
 
       const mappedRows = cases.map((item) => {
         const hearing = hearingByCase.get(item.case_id);
+        const rawStatus = String(item.case_status || '').toLowerCase();
         return {
           caseId: item.case_id,
           id: `CASE-${item.case_id}`,
@@ -62,6 +65,7 @@ export default function CourtadminCases() {
           category: item.case_category || 'General',
           submittedBy: item.submitted_by || 'Unknown',
           status: toDisplayStatus(item.case_status),
+          rawStatus,
           priority: normalizePriority(item.priority),
           filedOn: formatDate(item.filing_date || item.created_at),
           nextHearing: formatDate(hearing?.hearing_date),
@@ -87,6 +91,14 @@ export default function CourtadminCases() {
     loadCases();
   }, []);
 
+  useEffect(() => {
+    const focusedCaseId = String(searchParams.get('focusCaseId') || '').trim();
+    if (!focusedCaseId) return;
+
+    setActiveFilter('all');
+    setSearchTerm(`CASE-${focusedCaseId}`);
+  }, [searchParams]);
+
   const filteredRows = useMemo(() => {
     return caseRows.filter((item) => {
       const term = searchTerm.toLowerCase();
@@ -97,6 +109,7 @@ export default function CourtadminCases() {
 
       const matchesFilter =
         activeFilter === 'all' ||
+        (activeFilter === 'requested' && item.rawStatus === 'pending') ||
         (activeFilter === 'pending' && item.status === 'Pending') ||
         (activeFilter === 'active' && item.status === 'Active') ||
         (activeFilter === 'scheduled' && item.status === 'Scheduled') ||
@@ -147,6 +160,7 @@ export default function CourtadminCases() {
       sidebarTitle="Admin Panel"
       sidebarItems={[
         { key: 'all', label: 'All cases' },
+        { key: 'requested', label: 'Requested cases' },
         { key: 'pending', label: 'Pending cases' },
         { key: 'active', label: 'Active cases' },
         { key: 'scheduled', label: 'Scheduled cases' },
@@ -155,14 +169,13 @@ export default function CourtadminCases() {
       activeSidebarKey={activeFilter}
       onSidebarSelect={setActiveFilter}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Admin Cases</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Admin Cases</h2>
 
       {fetchError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
           {fetchError}
         </div>
       )}
-
       {actionError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
           {actionError}
@@ -192,16 +205,16 @@ export default function CourtadminCases() {
       />
 
       {isLoading && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', border: `1px solid ${ADMIN_THEME.border}`, padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>Loading cases...</p>
         </div>
       )}
 
       {!isLoading && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', border: `1px solid ${ADMIN_THEME.border}`, overflow: 'hidden' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: ADMIN_THEME.panel }}>
+              <tr className="pegasus-table-head">
                 {['Case No.', 'Title', 'Category', 'Participant', 'Filed on', 'Next hearing', 'Priority', 'Status'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
                 ))}

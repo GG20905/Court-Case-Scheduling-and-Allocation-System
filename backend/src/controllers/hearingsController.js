@@ -1,5 +1,41 @@
 const pool = require('../config/db');
 
+const parseRequestedDateTime = (dateValue, timeValue) => {
+  const dateText = String(dateValue || '').trim();
+  const timeText = String(timeValue || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return null;
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(timeText)) return null;
+
+  const [year, month, day] = dateText.split('-').map(Number);
+  const [hour, minute] = timeText.split(':').map(Number);
+  const parsed = new Date(year, month - 1, day, hour, minute, 0, 0);
+
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const parsePositiveIntId = (value) => {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return id;
+};
+
+const normalizeHearingMode = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'physical' || normalized === 'virtual') return normalized;
+  return '';
+};
+
+const isValidHttpUrl = (value) => {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 // POST /api/hearings/request
 const requestHearing = async (req, res) => {
   try {
@@ -7,6 +43,15 @@ const requestHearing = async (req, res) => {
 
     if (!case_id || !preferred_date || !preferred_time) {
       return res.status(400).json({ success: false, message: 'case_id, preferred_date and preferred_time are required.' });
+    }
+
+    const requestedDateTime = parseRequestedDateTime(preferred_date, preferred_time);
+    if (!requestedDateTime) {
+      return res.status(400).json({ success: false, message: 'Invalid preferred_date or preferred_time format.' });
+    }
+
+    if (requestedDateTime.getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: 'Preferred hearing date/time cannot be in the past.' });
     }
 
     const pResult = await pool.query(
@@ -64,9 +109,16 @@ const getHearings = async (req, res) => {
     } else if (req.user.role === 'judge') {
       const jResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
       query = `
-        SELECT h.*, c.case_title, c.priority
+        SELECT h.*, c.case_title, c.priority, ja.assignment_status
         FROM hearings h
         JOIN cases c ON h.case_id = c.case_id
+        LEFT JOIN LATERAL (
+          SELECT assignment_status
+          FROM judge_assignments
+          WHERE case_id = h.case_id AND judge_id = $1
+          ORDER BY updated_at DESC, assignment_date DESC, assignment_id DESC
+          LIMIT 1
+        ) ja ON TRUE
         WHERE h.judge_id = $1 ORDER BY h.hearing_date ASC`;
       params = [jResult.rows[0].judge_id];
     } else {
@@ -214,6 +266,11 @@ const respondToAssignment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'action must be "approve" or "reject".' });
     }
 
+    const normalizedRejectionReason = String(rejection_reason || '').trim();
+    if (action === 'reject' && !normalizedRejectionReason) {
+      return res.status(400).json({ success: false, message: 'rejection_reason is required when rejecting an assignment.' });
+    }
+
     const jResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
     if (jResult.rows.length === 0) {
       return res.status(403).json({ success: false, message: 'Judge record not found.' });
@@ -226,7 +283,7 @@ const respondToAssignment = async (req, res) => {
       `UPDATE judge_assignments SET
         assignment_status = $1, rejection_reason = $2, updated_at = NOW()
        WHERE assignment_id = $3 AND judge_id = $4 RETURNING *`,
-      [newStatus, rejection_reason || null, assignmentId, judge_id]
+      [newStatus, normalizedRejectionReason || null, assignmentId, judge_id]
     );
 
     if (result.rows.length === 0) {
@@ -236,6 +293,76 @@ const respondToAssignment = async (req, res) => {
     return res.status(200).json({ success: true, message: `Assignment ${newStatus}.`, data: result.rows[0] });
   } catch (err) {
     console.error('respondToAssignment error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+// PATCH /api/hearings/:id/mode  (judge)
+const setHearingModeByJudge = async (req, res) => {
+  try {
+    const parsedHearingId = parsePositiveIntId(req.params.id);
+    if (!parsedHearingId) {
+      return res.status(400).json({ success: false, message: 'Invalid hearing ID. It must be a positive integer.' });
+    }
+
+    const hearingMode = normalizeHearingMode(req.body?.hearing_mode);
+    const meetingLink = String(req.body?.meeting_link || '').trim();
+
+    if (!hearingMode) {
+      return res.status(400).json({ success: false, message: 'hearing_mode must be either "physical" or "virtual".' });
+    }
+
+    if (hearingMode === 'virtual' && (!meetingLink || !isValidHttpUrl(meetingLink))) {
+      return res.status(400).json({ success: false, message: 'A valid http(s) meeting_link is required for virtual hearings.' });
+    }
+
+    const judgeResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);
+    if (judgeResult.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Judge record not found.' });
+    }
+
+    const judgeId = judgeResult.rows[0].judge_id;
+
+    const hearingResult = await pool.query(
+      'SELECT hearing_id, case_id, judge_id FROM hearings WHERE hearing_id = $1',
+      [parsedHearingId]
+    );
+
+    if (hearingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hearing not found.' });
+    }
+
+    const hearing = hearingResult.rows[0];
+    if (Number(hearing.judge_id) !== Number(judgeId)) {
+      return res.status(403).json({ success: false, message: 'You are not assigned to this hearing.' });
+    }
+
+    const approvalResult = await pool.query(
+      `SELECT assignment_id
+       FROM judge_assignments
+       WHERE case_id = $1 AND judge_id = $2 AND assignment_status = 'approved'
+       ORDER BY updated_at DESC, assignment_date DESC, assignment_id DESC
+       LIMIT 1`,
+      [hearing.case_id, judgeId]
+    );
+
+    if (approvalResult.rows.length === 0) {
+      return res.status(403).json({ success: false, message: 'Set hearing mode is allowed only after you accept the assignment.' });
+    }
+
+    const updatedResult = await pool.query(
+      `UPDATE hearings
+       SET hearing_mode = $1,
+           meeting_link = CASE WHEN $1 = 'virtual' THEN $2 ELSE NULL END,
+           updated_at = NOW()
+       WHERE hearing_id = $3
+       RETURNING *`,
+      [hearingMode, meetingLink || null, parsedHearingId]
+    );
+
+    return res.status(200).json({ success: true, message: 'Hearing mode updated.', data: updatedResult.rows[0] });
+  } catch (err) {
+    console.error('setHearingModeByJudge error:', err);
     return res.status(500).json({ success: false, message: 'Server error.' });
   }
 };
@@ -302,5 +429,5 @@ const getHearingById = async (req, res) => {
 
 module.exports = {
   requestHearing, getHearings, createHearing, updateHearingStatus,
-  approveHearing, rejectHearing, respondToAssignment, reassignJudge, getHearingById
+  approveHearing, rejectHearing, respondToAssignment, setHearingModeByJudge, reassignJudge, getHearingById
 };

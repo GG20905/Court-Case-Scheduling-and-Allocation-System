@@ -14,6 +14,8 @@ const dashboardController = require('../controllers/dashboardController');
 // ─── AUTH ─────────────────────────────────────────────────────
 router.post('/auth/register', usersController.register);
 router.post('/auth/login', usersController.login);
+router.post('/auth/forgot-password', usersController.forgotPassword);
+router.post('/auth/reset-password', usersController.resetPassword);
 router.post('/auth/login/2fa', usersController.loginWith2FA);
 router.post('/auth/login/2fa/resend', usersController.resendLogin2FACode);
 router.get('/auth/me', authenticate, usersController.getMe);
@@ -48,6 +50,7 @@ router.patch('/hearings/:id/approve', authenticate, authorize('admin'), hearings
 router.patch('/hearings/:id/reject', authenticate, authorize('admin'), hearingsController.rejectHearing);
 router.patch('/hearings/:hearingId/reassign', authenticate, authorize('admin'), hearingsController.reassignJudge);
 router.patch('/hearings/assignments/:assignmentId/respond', authenticate, authorize('judge'), hearingsController.respondToAssignment);
+router.patch('/hearings/:id/mode', authenticate, authorize('judge'), hearingsController.setHearingModeByJudge);
 
 // ─── DOCUMENTS ────────────────────────────────────────────────
 router.post('/cases/:caseId/documents', authenticate, authorize('litigant', 'advocate'), upload.single('document'), documentsController.createDocument);

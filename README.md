@@ -44,6 +44,23 @@ Brevo settings:
 - `BREVO_API_KEY=...`
 - `BREVO_FROM_EMAIL=you@your-email.com`
 - `BREVO_FROM_NAME=Virtual Court` (optional)
+- `CLIENT_BASE_URL=http://localhost:5173` (used for secure password reset link generation)
+
+## Forgot Password (Secure Reset Link)
+
+Users can request a secure reset link only for registered accounts.
+
+Endpoints:
+
+- `POST /api/auth/forgot-password` with body `{ "email": "user@example.com" }`
+- `POST /api/auth/reset-password` with body `{ "token": "...", "new_password": "..." }`
+
+Security behavior:
+
+- Reset tokens are cryptographically random and one-time use.
+- Only token hash is stored in the database.
+- Token expires automatically (default 15 minutes).
+- API response for forgot-password does not reveal whether the email exists.
 
 ### API flow
 

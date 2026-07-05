@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './viewpages/LoginPage';
 import RegisterPage from './viewpages/RegisterPage';
 import TwoFactorPage from './viewpages/TwoFactorPage';
+import ForgotPasswordPage from './viewpages/ForgotPasswordPage';
+import ResetPasswordPage from './viewpages/ResetPasswordPage';
 import LitigantDashboard from './viewpages/Lit,Adv';
 import LitAdvCases from './viewpages/LitAdvCases';
 import LitAdvSchedule from './viewpages/LitAdvSchedule';
@@ -35,6 +37,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/login/2fa" element={<TwoFactorPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardRedirect />} />

@@ -121,7 +121,7 @@ export default function LitigantDashboard() {
       activeSidebarKey={activeSidebar}
       onSidebarSelect={handleSidebarSelect}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Litigant Dashboard</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Litigant Dashboard</h2>
 
       {fetchError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
@@ -145,32 +145,29 @@ export default function LitigantDashboard() {
           { title: 'My documents', value: stats.documentsCount },
         ].map((card) => (
           <div
+            className="pegasus-card"
             key={card.title}
             style={{
-              backgroundColor: '#fff',
-              border: `1px solid ${LITIGANT_THEME.border}`,
-              borderRadius: '10px',
+              borderRadius: '12px',
               padding: '12px 14px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
             }}
           >
             <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>{card.title}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>{isLoading ? '-' : card.value}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>{isLoading ? '-' : card.value}</p>
           </div>
         ))}
       </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <section
+          className="pegasus-block"
           style={{
-            backgroundColor: '#fff',
-            border: `1px solid ${LITIGANT_THEME.border}`,
-            borderRadius: '10px',
+            borderRadius: '12px',
             padding: '14px',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', color: '#1E2A45' }}>Recent Cases</h3>
+            <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Recent Cases</h3>
             <span onClick={() => navigate('/dashboard/litigant/cases')} style={{ fontSize: '12px', color: LITIGANT_THEME.accent, cursor: 'pointer' }}>
               View all →
             </span>
@@ -189,15 +186,14 @@ export default function LitigantDashboard() {
         </section>
 
         <section
+          className="pegasus-block"
           style={{
-            backgroundColor: '#fff',
-            border: `1px solid ${LITIGANT_THEME.border}`,
-            borderRadius: '10px',
+            borderRadius: '12px',
             padding: '14px',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', color: '#1E2A45' }}>Today Hearings</h3>
+            <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Today Hearings</h3>
             <button
               onClick={() => navigate('/dashboard/litigant/schedule')}
               style={{

@@ -155,6 +155,10 @@ export default function LoginPage() {
             }}
           />
 
+          <p style={{ marginTop: '-8px', marginBottom: '14px', textAlign: 'right', fontSize: '13px' }}>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </p>
+
           <button type="submit" className="auth-btn" disabled={isSubmitting}>
             {isSubmitting ? 'Please wait...' : 'Login'}
           </button>
