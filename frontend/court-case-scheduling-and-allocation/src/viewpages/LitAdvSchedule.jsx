@@ -54,6 +54,29 @@ const fullDateKey = (dateValue) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const toDateInputValue = (dateValue) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const toTimeInputValue = (dateValue) => {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+const combineDateAndTime = (dateText, timeText) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateText || ''))) return null;
+  if (!/^\d{2}:\d{2}$/.test(String(timeText || ''))) return null;
+
+  const [year, month, day] = String(dateText).split('-').map(Number);
+  const [hour, minute] = String(timeText).split(':').map(Number);
+  const parsed = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 export default function LitAdvSchedule() {
   const [view, setView] = useState('request');
   const [now, setNow] = useState(new Date());
@@ -180,6 +203,22 @@ export default function LitAdvSchedule() {
     }
   }, [caseTypeOptions, requestCaseType]);
 
+  const minDateForRequest = useMemo(() => toDateInputValue(now), [now]);
+
+  const minTimeForToday = useMemo(() => {
+    if (preferredDate !== minDateForRequest) return '';
+    return toTimeInputValue(now);
+  }, [minDateForRequest, now, preferredDate]);
+
+  useEffect(() => {
+    if (!preferredDate || !preferredTime) return;
+    const selected = combineDateAndTime(preferredDate, preferredTime);
+    if (!selected) return;
+    if (selected.getTime() < now.getTime()) {
+      setPreferredTime('');
+    }
+  }, [preferredDate, preferredTime, now]);
+
   const handleRequestHearing = async () => {
     setRequestError('');
     setRequestMessage('');
@@ -188,6 +227,17 @@ export default function LitAdvSchedule() {
 
     if (!effectiveCaseType || !preferredDate || !preferredTime) {
       setRequestError('Please fill case type, date and time.');
+      return;
+    }
+
+    const selectedDateTime = combineDateAndTime(preferredDate, preferredTime);
+    if (!selectedDateTime) {
+      setRequestError('Please choose a valid date and time.');
+      return;
+    }
+
+    if (selectedDateTime.getTime() < Date.now()) {
+      setRequestError('Past hearing dates/times are not allowed.');
       return;
     }
 
@@ -256,7 +306,7 @@ export default function LitAdvSchedule() {
       activeSidebarKey={view}
       onSidebarSelect={setView}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>My Schedule</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>My Schedule</h2>
 
       {fetchError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
@@ -277,8 +327,8 @@ export default function LitAdvSchedule() {
       )}
 
       {view === 'request' && (
-        <section style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 10px', fontSize: '15px', color: '#1E2A45' }}>Request Hearing</h3>
+        <section className="pegasus-block" style={{ borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+          <h3 className="pegasus-section-title" style={{ margin: '0 0 10px', fontSize: '16px', color: '#1E2A45' }}>Request Hearing</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 0.9fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <input
               type="text"
@@ -312,12 +362,14 @@ export default function LitAdvSchedule() {
               type="date"
               value={preferredDate}
               onChange={(e) => setPreferredDate(e.target.value)}
+              min={minDateForRequest}
               style={{ padding: '9px', borderRadius: '8px', border: `1px solid ${LITIGANT_THEME.border}` }}
             />
             <input
               type="time"
               value={preferredTime}
               onChange={(e) => setPreferredTime(e.target.value)}
+              min={minTimeForToday || undefined}
               style={{ padding: '9px', borderRadius: '8px', border: `1px solid ${LITIGANT_THEME.border}` }}
             />
           </div>
@@ -357,13 +409,13 @@ export default function LitAdvSchedule() {
       )}
 
       {isLoading && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>Loading hearings...</p>
         </div>
       )}
 
       {!isLoading && view === 'monthly' && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', padding: '12px', maxWidth: '1040px', margin: '0 auto' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '12px', maxWidth: '1040px', margin: '0 auto' }}>
           <p style={{ margin: '0 0 2px', color: '#334155', fontWeight: 700 }}>
             {now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
           </p>
@@ -410,10 +462,10 @@ export default function LitAdvSchedule() {
       )}
 
       {!isLoading && view === 'all' && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '10px', overflow: 'hidden' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: LITIGANT_THEME.panel }}>
+              <tr className="pegasus-table-head">
                 {['Case', 'Day', 'Time', 'Title', 'Judge', 'Status'].map((header) => (
                   <th key={header} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '12px', color: '#334155' }}>{header}</th>
                 ))}

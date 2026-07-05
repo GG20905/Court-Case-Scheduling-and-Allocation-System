@@ -276,6 +276,44 @@ const downloadDocument = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Document not found.' });
     }
     const doc = result.rows[0];
+
+    if (req.user.role === 'judge') {
+      const hasDocumentShares = await checkDocumentSharesSupport();
+      if (!hasDocumentShares) {
+        return res.status(403).json({ success: false, message: 'Document sharing is not initialized in this database.' });
+      }
+
+      const judgeResult = await pool.query(
+        'SELECT judge_id FROM judges WHERE user_id = $1',
+        [req.user.user_id]
+      );
+
+      if (judgeResult.rows.length === 0) {
+        return res.status(403).json({ success: false, message: 'Judge record not found.' });
+      }
+
+      const judgeId = judgeResult.rows[0].judge_id;
+      const shareResult = await pool.query(
+        'SELECT share_id FROM document_shares WHERE document_id = $1 AND judge_id = $2 LIMIT 1',
+        [parsedDocumentId, judgeId]
+      );
+
+      if (shareResult.rows.length === 0) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
+      }
+    }
+
+    if (req.user.role === 'litigant' || req.user.role === 'advocate') {
+      const participantResult = await pool.query(
+        'SELECT participant_id FROM litigants_advocates WHERE user_id = $1',
+        [req.user.user_id]
+      );
+
+      if (participantResult.rows.length === 0 || participantResult.rows[0].participant_id !== doc.participant_id) {
+        return res.status(403).json({ success: false, message: 'You are not authorized to access this document.' });
+      }
+    }
+
     const filePath = path.resolve(doc.file_path);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server.' });

@@ -248,7 +248,7 @@ export default function CourtadminSchedule() {
       activeSidebarKey={view}
       onSidebarSelect={setView}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Admin Schedule</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>Admin Schedule</h2>
 
       {fetchError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
@@ -269,16 +269,16 @@ export default function CourtadminSchedule() {
       )}
 
       {isLoading && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>Loading hearings...</p>
         </div>
       )}
 
       {!isLoading && view === 'requests' && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', overflow: 'hidden' }}>
+          <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: ADMIN_THEME.panel }}>
+              <tr className="pegasus-table-head">
                 {['Case', 'Date', 'Time', 'Title', 'Assign Judge', 'Actions'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
                 ))}
@@ -356,7 +356,7 @@ export default function CourtadminSchedule() {
       )}
 
       {!isLoading && view === 'monthly' && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', padding: '12px', maxWidth: '1040px', margin: '0 auto' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '12px', maxWidth: '1040px', margin: '0 auto' }}>
           <p style={{ margin: '0 0 2px', color: '#334155', fontWeight: 700 }}>
             {now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
           </p>
@@ -401,10 +401,10 @@ export default function CourtadminSchedule() {
       )}
 
       {!isLoading && view === 'all' && (
-        <div style={{ backgroundColor: '#fff', border: `1px solid ${ADMIN_THEME.border}`, borderRadius: '10px', overflow: 'hidden' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: ADMIN_THEME.panel }}>
+              <tr className="pegasus-table-head">
                 {['Case', 'Day', 'Time', 'Title', 'Judge', 'Status'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
                 ))}

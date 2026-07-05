@@ -1,13 +1,13 @@
 import DashboardDrawerShell from './DashboardDrawerShell';
 
 const navRouteByItem = {
-  Dashboard: '/dashboard/litigant',
-  Cases: '/dashboard/litigant/cases',
-  Schedule: '/dashboard/litigant/schedule',
-  Documents: '/dashboard/litigant/documents',
+  Dashboard: '/dashboard/judge',
+  Cases: '/dashboard/judge/cases',
+  Schedule: '/dashboard/judge/schedule',
+  Documents: '/dashboard/judge/documents',
 };
 
-export const LITIGANT_THEME = {
+export const JUDGE_THEME = {
   pageBg: '#f5f7fc',
   navPrimary: '#0d1652',
   navText: '#d2ddff',
@@ -16,7 +16,7 @@ export const LITIGANT_THEME = {
   border: '#a8bfe0',
 };
 
-export default function LitigantPageShell({
+export default function JudgePageShell({
   activeNav,
   sidebarTitle,
   sidebarItems,
@@ -33,7 +33,7 @@ export default function LitigantPageShell({
       activeSidebarKey={activeSidebarKey}
       onSidebarSelect={onSidebarSelect}
       topNavExtra={topNavExtra}
-      theme={LITIGANT_THEME}
+      theme={JUDGE_THEME}
       navRouteByItem={navRouteByItem}
     >
       {children}

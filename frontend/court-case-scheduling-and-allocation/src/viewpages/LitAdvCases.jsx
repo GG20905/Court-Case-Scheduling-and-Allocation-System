@@ -54,6 +54,7 @@ export default function LitAdvCases() {
       setCaseRows(
         cases.map((item) => {
           const hearing = hearingByCase.get(item.case_id);
+          const rawStatus = String(item.case_status || '').toLowerCase();
           return {
             caseId: item.case_id,
             id: `CASE-${item.case_id}`,
@@ -61,6 +62,7 @@ export default function LitAdvCases() {
             type: item.case_category || 'General',
             status: toDisplayStatus(item.case_status),
             workflowState: toWorkflowState(item.case_status),
+            rawStatus,
             nextHearing: formatDate(hearing?.hearing_date),
             judge: hearing?.judge_name || 'Not assigned',
           };
@@ -85,7 +87,9 @@ export default function LitAdvCases() {
 
       const matchesFilter =
         (activeFilter === 'all') ||
-        (activeFilter === 'accepted' && item.workflowState === 'Accepted');
+        (activeFilter === 'accepted' && (item.workflowState === 'Accepted' || item.workflowState === 'Requested')) ||
+        (activeFilter === 'requested' && item.rawStatus === 'pending') ||
+        (activeFilter === 'scheduled' && item.rawStatus === 'scheduled');
 
       return matchesSearch && matchesFilter;
     });
@@ -97,12 +101,14 @@ export default function LitAdvCases() {
       sidebarTitle="Litigant Panel"
       sidebarItems={[
         { key: 'accepted', label: 'Accepted cases' },
+        { key: 'requested', label: 'Requested cases' },
+        { key: 'scheduled', label: 'Scheduled cases' },
         { key: 'all', label: 'All my cases' },
       ]}
       activeSidebarKey={activeFilter}
       onSidebarSelect={setActiveFilter}
     >
-      <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>My Cases</h2>
+      <h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '16px' }}>My Cases</h2>
 
       {fetchError && (
         <div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
@@ -128,24 +134,22 @@ export default function LitAdvCases() {
       />
 
       {isLoading && (
-        <div style={{ backgroundColor: '#fff', borderRadius: '10px', border: `1px solid ${LITIGANT_THEME.border}`, padding: '20px' }}>
+        <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>Loading cases...</p>
         </div>
       )}
 
       {!isLoading && (
         <div
+          className="pegasus-block"
           style={{
-            backgroundColor: '#fff',
-            borderRadius: '10px',
-            border: `1px solid ${LITIGANT_THEME.border}`,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            borderRadius: '12px',
             overflow: 'hidden',
           }}
         >
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: LITIGANT_THEME.panel }}>
+              <tr className="pegasus-table-head">
                 {['Case No.', 'Title', 'Category', 'Judge', 'Next hearing', 'Status'].map((header) => (
                   <th key={header} style={{ textAlign: 'left', padding: '12px 14px', fontSize: '12px', color: '#334155' }}>
                     {header}

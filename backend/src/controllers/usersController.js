@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../config/db');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
@@ -17,6 +18,9 @@ const getBrevoConfigStatus = () => {
 };
 
 const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
+const passwordResetTokenTtlMinutes = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || 15);
+const passwordResetMinIntervalSeconds = Number(process.env.PASSWORD_RESET_MIN_INTERVAL_SECONDS || 60);
+const frontendBaseUrl = (process.env.CLIENT_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
 
 const normalizeLoginRoleSelection = (rawRole) => {
@@ -125,13 +129,18 @@ const buildOtpMessage = (code) => ({
   html: `<p>Your login verification code is <strong>${code}</strong>.</p><p>This code expires in 10 minutes.</p>`,
 });
 
-const sendViaBrevoApi = async (toEmail, code) => {
+const buildPasswordResetMessage = (fullName, resetUrl) => ({
+  subject: 'Reset your Court System password',
+  text: `Hello ${fullName || 'there'},\n\nWe received a request to reset your password.\nUse this secure link to set a new password: ${resetUrl}\n\nThis link expires in ${passwordResetTokenTtlMinutes} minutes and can be used only once. If you did not request this, you can safely ignore this email.`,
+  html: `<p>Hello ${fullName || 'there'},</p><p>We received a request to reset your password.</p><p><a href="${resetUrl}">Click here to reset your password</a></p><p>This link expires in ${passwordResetTokenTtlMinutes} minutes and can be used only once.</p><p>If you did not request this, you can safely ignore this email.</p>`,
+});
+
+const sendViaBrevoApi = async (toEmail, message) => {
   const brevoConfig = getBrevoConfigStatus();
   if (!brevoConfig.isConfigured) {
     throw new Error('Brevo API is not configured on the server.');
   }
 
-  const message = buildOtpMessage(code);
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -160,19 +169,10 @@ const sendViaBrevoApi = async (toEmail, code) => {
 };
 
 const sendTwoFactorCodeEmail = async (toEmail, code) => {
-  const brevoConfig = getBrevoConfigStatus();
-
-  if (!brevoConfig.isConfigured) {
-    return {
-      delivered: false,
-      provider: 'none',
-      reason: 'provider_missing',
-      detail: `Missing email provider configuration: ${brevoConfig.missing.join(', ')}.`,
-    };
-  }
+  const message = buildOtpMessage(code);
 
   try {
-    await sendViaBrevoApi(toEmail, code);
+    await sendViaBrevoApi(toEmail, message);
     return {
       delivered: true,
       provider: 'brevo',
@@ -188,6 +188,43 @@ const sendTwoFactorCodeEmail = async (toEmail, code) => {
       detail: `brevo: ${err.message}`,
     };
   }
+};
+
+const generatePasswordResetToken = () => crypto.randomBytes(32).toString('hex');
+
+const hashPasswordResetToken = (token) =>
+  crypto.createHash('sha256').update(String(token || '')).digest('hex');
+
+const sendPasswordResetEmail = async ({ toEmail, fullName, token }) => {
+  const resetUrl = `${frontendBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+  const message = buildPasswordResetMessage(fullName, resetUrl);
+
+  try {
+    await sendViaBrevoApi(toEmail, message);
+    return {
+      delivered: true,
+      provider: 'brevo',
+      reason: 'sent',
+      detail: 'Password reset email sent using Brevo API.',
+    };
+  } catch (err) {
+    console.error('Password reset email delivery error (brevo):', err.message);
+    const brevoConfig = getBrevoConfigStatus();
+    const missingDetail = brevoConfig.isConfigured
+      ? ''
+      : ` Missing configuration: ${brevoConfig.missing.join(', ')}.`;
+    return {
+      delivered: false,
+      provider: 'none',
+      reason: 'provider_failed_or_missing',
+      detail: `${err.message}.${missingDetail}`.trim(),
+    };
+  }
+};
+
+const isStrongPassword = (value) => {
+  const password = String(value || '');
+  return password.length >= 8 && password.length <= 128;
 };
 
 const issueAndSendTwoFactorCode = async (user) => {
@@ -554,11 +591,121 @@ const createUser = async (req, res) => {
   return register(req, res);
 };
 
+// POST /api/auth/forgot-password
+const forgotPassword = async (req, res) => {
+  const genericMessage = 'If an account exists for this email, a secure password reset link has been sent.';
+
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
+
+    const userResult = await pool.query(
+      `SELECT user_id, email, full_name, password_reset_requested_at
+       FROM users
+       WHERE email = $1`,
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(200).json({ success: true, message: genericMessage });
+    }
+
+    const user = userResult.rows[0];
+    const now = Date.now();
+    const lastRequestedAt = user.password_reset_requested_at ? new Date(user.password_reset_requested_at).getTime() : 0;
+    const minIntervalMs = Math.max(0, passwordResetMinIntervalSeconds) * 1000;
+
+    if (lastRequestedAt && now - lastRequestedAt < minIntervalMs) {
+      return res.status(200).json({ success: true, message: genericMessage });
+    }
+
+    const token = generatePasswordResetToken();
+    const tokenHash = hashPasswordResetToken(token);
+    const expiresAt = new Date(now + Math.max(1, passwordResetTokenTtlMinutes) * 60 * 1000);
+
+    await pool.query(
+      `UPDATE users
+       SET password_reset_token_hash = $1,
+           password_reset_token_expires_at = $2,
+           password_reset_requested_at = NOW()
+       WHERE user_id = $3`,
+      [tokenHash, expiresAt, user.user_id]
+    );
+
+    await sendPasswordResetEmail({
+      toEmail: user.email,
+      fullName: user.full_name,
+      token,
+    });
+
+    return res.status(200).json({ success: true, message: genericMessage });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    return res.status(500).json({ success: false, message: 'Server error while processing password reset.' });
+  }
+};
+
+// POST /api/auth/reset-password
+const resetPassword = async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const newPassword = String(req.body?.new_password || '');
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: 'token and new_password are required.' });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({ success: false, message: 'Password must be between 8 and 128 characters.' });
+    }
+
+    const tokenHash = hashPasswordResetToken(token);
+    const result = await pool.query(
+      `SELECT user_id
+       FROM users
+       WHERE password_reset_token_hash = $1
+         AND password_reset_token_expires_at IS NOT NULL
+         AND password_reset_token_expires_at > NOW()
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired password reset link.' });
+    }
+
+    const userId = result.rows[0].user_id;
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await pool.query(
+      `UPDATE users
+       SET password = $1,
+           password_reset_token_hash = NULL,
+           password_reset_token_expires_at = NULL,
+           password_reset_requested_at = NULL,
+           two_factor_code_hash = NULL,
+           two_factor_code_expires_at = NULL,
+           updated_at = NOW()
+       WHERE user_id = $2`,
+      [hashedPassword, userId]
+    );
+
+    return res.status(200).json({ success: true, message: 'Password reset successful. You can now login with your new password.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    return res.status(500).json({ success: false, message: 'Server error while resetting password.' });
+  }
+};
+
 module.exports = {
   register,
   login,
   loginWith2FA,
   resendLogin2FACode,
+  forgotPassword,
+  resetPassword,
   setup2FA,
   enable2FA,
   disable2FA,

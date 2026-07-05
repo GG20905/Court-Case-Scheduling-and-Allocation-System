@@ -55,9 +55,20 @@ const getCases = async (req, res) => {
 
     if (req.user.role === 'admin') {
       query = `
-        SELECT c.*, la.full_name AS submitted_by, la.participant_type
+        SELECT c.*, la.full_name AS submitted_by, la.participant_type,
+          ja.assignment_status,
+          ja.rejection_reason,
+          j.full_name AS assigned_judge_name
         FROM cases c
         LEFT JOIN litigants_advocates la ON c.participant_id = la.participant_id
+        LEFT JOIN LATERAL (
+          SELECT assignment_status, rejection_reason, judge_id
+          FROM judge_assignments
+          WHERE case_id = c.case_id
+          ORDER BY updated_at DESC, assignment_date DESC, assignment_id DESC
+          LIMIT 1
+        ) ja ON TRUE
+        LEFT JOIN judges j ON j.judge_id = ja.judge_id
         ORDER BY c.created_at DESC`;
     } else if (req.user.role === 'judge') {
       const judgeResult = await pool.query('SELECT judge_id FROM judges WHERE user_id = $1', [req.user.user_id]);

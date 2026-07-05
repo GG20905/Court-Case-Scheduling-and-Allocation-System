@@ -11,6 +11,9 @@ CREATE TABLE users (
   two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   two_factor_code_hash VARCHAR(255),
   two_factor_code_expires_at TIMESTAMP,
+  password_reset_token_hash VARCHAR(255),
+  password_reset_token_expires_at TIMESTAMP,
+  password_reset_requested_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -98,6 +101,8 @@ CREATE TABLE hearings (
   admin_id      INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
   hearing_date  DATE NOT NULL,
   hearing_time  TIME NOT NULL,
+  hearing_mode  VARCHAR(20) NOT NULL DEFAULT 'physical'
+                CHECK (hearing_mode IN ('physical', 'virtual')),
   meeting_link  VARCHAR(255),
   status        VARCHAR(50) NOT NULL DEFAULT 'requested'
                 CHECK (status IN ('requested', 'scheduled', 'completed', 'cancelled', 'postponed')),
