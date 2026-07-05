@@ -96,10 +96,18 @@ const getHearings = async (req, res) => {
 
     if (req.user.role === 'admin') {
       query = `
-        SELECT h.*, c.case_title, c.case_status, j.full_name AS judge_name
+        SELECT h.*, c.case_title, c.case_status, j.full_name AS judge_name, j.specialty AS judge_specialty,
+          ja.assignment_status, ja.rejection_reason
         FROM hearings h
         JOIN cases c ON h.case_id = c.case_id
         LEFT JOIN judges j ON h.judge_id = j.judge_id
+        LEFT JOIN LATERAL (
+          SELECT assignment_status, rejection_reason
+          FROM judge_assignments
+          WHERE case_id = h.case_id
+          ORDER BY updated_at DESC, assignment_date DESC, assignment_id DESC
+          LIMIT 1
+        ) ja ON TRUE
         ORDER BY
           CASE WHEN h.status = 'requested' THEN 0 ELSE 1 END,
           CASE WHEN h.status = 'requested' THEN h.created_at END ASC,
@@ -124,7 +132,7 @@ const getHearings = async (req, res) => {
     } else {
       const pResult = await pool.query('SELECT participant_id FROM litigants_advocates WHERE user_id = $1', [req.user.user_id]);
       query = `
-        SELECT h.*, c.case_title, j.full_name AS judge_name
+        SELECT h.*, c.case_title, j.full_name AS judge_name, j.specialty AS judge_specialty
         FROM hearings h
         JOIN cases c ON h.case_id = c.case_id
         LEFT JOIN judges j ON h.judge_id = j.judge_id

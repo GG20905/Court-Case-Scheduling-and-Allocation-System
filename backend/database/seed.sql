@@ -30,8 +30,8 @@ FROM users u
 WHERE u.role = 'admin'
 ON CONFLICT (user_id) DO NOTHING;
 
-INSERT INTO judges (user_id, full_name, email, password, court_station)
-SELECT u.user_id, u.full_name, u.email, u.password, 'Milimani Law Courts'
+INSERT INTO judges (user_id, full_name, email, password, court_station, specialty)
+SELECT u.user_id, u.full_name, u.email, u.password, 'Milimani Law Courts', 'Criminal Division'
 FROM users u
 WHERE u.role = 'judge'
 ON CONFLICT (user_id) DO NOTHING;

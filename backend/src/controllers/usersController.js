@@ -4,12 +4,44 @@ const crypto = require('crypto');
 const pool = require('../config/db');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
-const isBrevoConfigured = Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
+const getBrevoConfigStatus = () => {
+  const hasApiKey = Boolean(String(process.env.BREVO_API_KEY || '').trim());
+  const hasFromEmail = Boolean(String(process.env.BREVO_FROM_EMAIL || '').trim());
+
+  return {
+    isConfigured: hasApiKey && hasFromEmail,
+    missing: [
+      ...(hasApiKey ? [] : ['BREVO_API_KEY']),
+      ...(hasFromEmail ? [] : ['BREVO_FROM_EMAIL']),
+    ],
+  };
+};
+
 const isTwoFactorRequiredByDefault = (process.env.TWO_FACTOR_REQUIRED || 'true') === 'true';
 const passwordResetTokenTtlMinutes = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || 15);
 const passwordResetMinIntervalSeconds = Number(process.env.PASSWORD_RESET_MIN_INTERVAL_SECONDS || 60);
 const frontendBaseUrl = (process.env.CLIENT_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
+const validJudgeSpecialties = [
+  'Environment and Land Court (ELC)',
+  'Employment and Labour Relations Court (ELRC)',
+  "Kadhi's Courts",
+  'Family and Children Division',
+  'Commercial and Tax Division',
+  'Constitutional and Human Rights Division',
+  'Criminal Division',
+  'Anti-Corruption and Economic Crimes Division',
+  'Judicial Review Division',
+  'Admiralty Division',
+  'Civil Division',
+  'Sexual and Gender-Based Violence (SGBV) Courts',
+  "Children's Courts",
+  'Counter-Terrorism Courts',
+  'JKIA Courts',
+];
+const judgeSpecialtyLookup = new Map(
+  validJudgeSpecialties.map((value) => [String(value).trim().toLowerCase(), value])
+);
 
 const normalizeLoginRoleSelection = (rawRole) => {
   const value = String(rawRole || '').trim().toLowerCase();
@@ -38,6 +70,11 @@ const isLoginRoleAllowedForUser = (requestedRole, userRole) => {
   }
 
   return requestedRole === userRole;
+};
+
+const normalizeJudgeSpecialty = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return judgeSpecialtyLookup.get(normalized) || '';
 };
 
 const generateToken = (user) => {
@@ -87,7 +124,17 @@ const validateTwoFactorToken = (twoFactorToken) => {
   return { ok: true, decoded };
 };
 
-const insertRoleRecord = async (client, role, user, fullName, email, hashedPassword, participantType, courtStation) => {
+const insertRoleRecord = async (
+  client,
+  role,
+  user,
+  fullName,
+  email,
+  hashedPassword,
+  participantType,
+  courtStation,
+  judgeSpecialty
+) => {
   if (role === 'admin') {
     return client.query(
       `INSERT INTO court_administrators (user_id, full_name, email, password)
@@ -98,9 +145,9 @@ const insertRoleRecord = async (client, role, user, fullName, email, hashedPassw
 
   if (role === 'judge') {
     return client.query(
-      `INSERT INTO judges (user_id, full_name, email, password, court_station)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [user.user_id, fullName, email, hashedPassword, courtStation]
+      `INSERT INTO judges (user_id, full_name, email, password, court_station, specialty)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [user.user_id, fullName, email, hashedPassword, courtStation, judgeSpecialty]
     );
   }
 
@@ -124,7 +171,8 @@ const buildPasswordResetMessage = (fullName, resetUrl) => ({
 });
 
 const sendViaBrevoApi = async (toEmail, message) => {
-  if (!isBrevoConfigured) {
+  const brevoConfig = getBrevoConfigStatus();
+  if (!brevoConfig.isConfigured) {
     throw new Error('Brevo API is not configured on the server.');
   }
 
@@ -156,34 +204,25 @@ const sendViaBrevoApi = async (toEmail, message) => {
 };
 
 const sendTwoFactorCodeEmail = async (toEmail, code) => {
-  const attempts = [];
   const message = buildOtpMessage(code);
 
-  if (isBrevoConfigured) {
-    try {
-      await sendViaBrevoApi(toEmail, message);
-      return {
-        delivered: true,
-        provider: 'brevo',
-        reason: 'sent',
-        detail: '2FA code sent using Brevo API.',
-      };
-    } catch (err) {
-      console.error('2FA email delivery error (brevo):', err.message);
-      attempts.push(`brevo: ${err.message}`);
-    }
+  try {
+    await sendViaBrevoApi(toEmail, message);
+    return {
+      delivered: true,
+      provider: 'brevo',
+      reason: 'sent',
+      detail: '2FA code sent using Brevo API.',
+    };
+  } catch (err) {
+    console.error('2FA email delivery error (brevo):', err.message);
+    return {
+      delivered: false,
+      provider: 'brevo',
+      reason: 'provider_failed',
+      detail: `brevo: ${err.message}`,
+    };
   }
-
-  if (!isBrevoConfigured) {
-    attempts.push('No email provider configured. Add Brevo credentials in backend/.env.');
-  }
-
-  return {
-    delivered: false,
-    provider: 'none',
-    reason: 'provider_failed_or_missing',
-    detail: attempts.join(' | '),
-  };
 };
 
 const generatePasswordResetToken = () => crypto.randomBytes(32).toString('hex');
@@ -192,35 +231,30 @@ const hashPasswordResetToken = (token) =>
   crypto.createHash('sha256').update(String(token || '')).digest('hex');
 
 const sendPasswordResetEmail = async ({ toEmail, fullName, token }) => {
-  const attempts = [];
   const resetUrl = `${frontendBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
   const message = buildPasswordResetMessage(fullName, resetUrl);
 
-  if (isBrevoConfigured) {
-    try {
-      await sendViaBrevoApi(toEmail, message);
-      return {
-        delivered: true,
-        provider: 'brevo',
-        reason: 'sent',
-        detail: 'Password reset email sent using Brevo API.',
-      };
-    } catch (err) {
-      console.error('Password reset email delivery error (brevo):', err.message);
-      attempts.push(`brevo: ${err.message}`);
-    }
+  try {
+    await sendViaBrevoApi(toEmail, message);
+    return {
+      delivered: true,
+      provider: 'brevo',
+      reason: 'sent',
+      detail: 'Password reset email sent using Brevo API.',
+    };
+  } catch (err) {
+    console.error('Password reset email delivery error (brevo):', err.message);
+    const brevoConfig = getBrevoConfigStatus();
+    const missingDetail = brevoConfig.isConfigured
+      ? ''
+      : ` Missing configuration: ${brevoConfig.missing.join(', ')}.`;
+    return {
+      delivered: false,
+      provider: 'none',
+      reason: 'provider_failed_or_missing',
+      detail: `${err.message}.${missingDetail}`.trim(),
+    };
   }
-
-  if (!isBrevoConfigured) {
-    attempts.push('No email provider configured. Add Brevo credentials in backend/.env.');
-  }
-
-  return {
-    delivered: false,
-    provider: 'none',
-    reason: 'provider_failed_or_missing',
-    detail: attempts.join(' | '),
-  };
 };
 
 const isStrongPassword = (value) => {
@@ -252,7 +286,16 @@ const issueAndSendTwoFactorCode = async (user) => {
 const register = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { full_name, email, password, role, participant_type, court_station } = req.body;
+    const {
+      full_name,
+      email,
+      password,
+      role,
+      participant_type,
+      court_station,
+      judge_specialty,
+      judge_speciality,
+    } = req.body;
 
     if (!full_name || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'full_name, email, password and role are required.' });
@@ -268,6 +311,14 @@ const register = async (req, res) => {
 
     if (role === 'judge' && !court_station) {
       return res.status(400).json({ success: false, message: 'court_station is required for judge.' });
+    }
+
+    const normalizedJudgeSpecialty = normalizeJudgeSpecialty(judge_specialty || judge_speciality);
+    if (role === 'judge' && !normalizedJudgeSpecialty) {
+      return res.status(400).json({
+        success: false,
+        message: `judge_specialty is required and must be one of: ${validJudgeSpecialties.join(', ')}.`,
+      });
     }
 
     await client.query('BEGIN');
@@ -288,7 +339,17 @@ const register = async (req, res) => {
     );
     const user = userResult.rows[0];
 
-    await insertRoleRecord(client, role, user, full_name, email, hashedPassword, participant_type, court_station);
+    await insertRoleRecord(
+      client,
+      role,
+      user,
+      full_name,
+      email,
+      hashedPassword,
+      participant_type,
+      court_station,
+      normalizedJudgeSpecialty
+    );
 
     await client.query('COMMIT');
     const token = generateToken(user);

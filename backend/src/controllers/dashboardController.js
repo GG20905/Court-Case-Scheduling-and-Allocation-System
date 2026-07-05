@@ -43,7 +43,7 @@ const getSummary = async (req, res) => {
 const getJudges = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT j.judge_id, j.full_name, j.email, j.court_station,
+      `SELECT j.judge_id, j.full_name, j.email, j.court_station, j.specialty,
         COUNT(ja.assignment_id) FILTER (WHERE ja.assignment_status = 'approved') AS active_cases
        FROM judges j
        LEFT JOIN judge_assignments ja ON j.judge_id = ja.judge_id
