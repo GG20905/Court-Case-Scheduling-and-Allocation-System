@@ -11,6 +11,9 @@ CREATE TABLE users (
   two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   two_factor_code_hash VARCHAR(255),
   two_factor_code_expires_at TIMESTAMP,
+  password_reset_token_hash VARCHAR(255),
+  password_reset_token_expires_at TIMESTAMP,
+  password_reset_requested_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -64,7 +67,7 @@ CREATE TABLE cases (
   case_status      VARCHAR(50) NOT NULL DEFAULT 'pending'
                    CHECK (case_status IN ('pending', 'active', 'scheduled', 'closed', 'dismissed')),
   priority         VARCHAR(20) NOT NULL DEFAULT 'normal'
-                   CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+                   CHECK (priority IN ('normal', 'high', 'urgent')),
   filing_date      DATE NOT NULL DEFAULT CURRENT_DATE,
   participant_id   INT REFERENCES litigants_advocates(participant_id) ON DELETE SET NULL,
   admin_id         INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
@@ -98,6 +101,8 @@ CREATE TABLE hearings (
   admin_id      INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
   hearing_date  DATE NOT NULL,
   hearing_time  TIME NOT NULL,
+  hearing_mode  VARCHAR(20) NOT NULL DEFAULT 'physical'
+                CHECK (hearing_mode IN ('physical', 'virtual')),
   meeting_link  VARCHAR(255),
   status        VARCHAR(50) NOT NULL DEFAULT 'requested'
                 CHECK (status IN ('requested', 'scheduled', 'completed', 'cancelled', 'postponed')),
@@ -119,6 +124,20 @@ CREATE TABLE documents (
   file_path      VARCHAR(255) NOT NULL,
   upload_date    DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at     TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================================
+-- DOCUMENT SHARES (admin -> designated judge)
+-- ============================================================
+CREATE TABLE document_shares (
+  share_id            SERIAL PRIMARY KEY,
+  document_id         INT NOT NULL UNIQUE REFERENCES documents(document_id) ON DELETE CASCADE,
+  case_id             INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
+  judge_id            INT NOT NULL REFERENCES judges(judge_id) ON DELETE CASCADE,
+  shared_by_admin_id  INT REFERENCES court_administrators(admin_id) ON DELETE SET NULL,
+  shared_at           TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at          TIMESTAMP DEFAULT NOW(),
+  updated_at          TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================================
@@ -147,6 +166,8 @@ CREATE INDEX idx_hearings_case        ON hearings(case_id);
 CREATE INDEX idx_hearings_judge       ON hearings(judge_id);
 CREATE INDEX idx_hearings_date        ON hearings(hearing_date);
 CREATE INDEX idx_documents_case       ON documents(case_id);
+CREATE INDEX idx_document_shares_case ON document_shares(case_id);
+CREATE INDEX idx_document_shares_judge ON document_shares(judge_id);
 CREATE INDEX idx_assignments_case     ON judge_assignments(case_id);
 CREATE INDEX idx_assignments_judge    ON judge_assignments(judge_id);
 CREATE INDEX idx_rulings_case         ON rulings(case_id);
@@ -176,4 +197,8 @@ CREATE TRIGGER update_assignments_updated_at
 
 CREATE TRIGGER update_rulings_updated_at
   BEFORE UPDATE ON rulings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_document_shares_updated_at
+  BEFORE UPDATE ON document_shares
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

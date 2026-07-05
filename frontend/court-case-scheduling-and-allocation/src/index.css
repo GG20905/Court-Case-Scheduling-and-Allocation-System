@@ -1,3 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --pegasus-font-ui: 'Manrope', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --pegasus-font-display: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  --pegasus-card-bg: linear-gradient(160deg, #fdfefe 0%, #f3f8ff 100%);
+  --pegasus-card-border: #c5d5ef;
+  --pegasus-soft-shadow: 0 8px 20px rgba(17, 43, 90, 0.08);
+}
+
 /* ── Reset ──────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -6,9 +16,23 @@
 }
  
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--pegasus-font-ui);
   background-color: #f5f7fc;
   min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
 }
  
 /* ── Navbar ─────────────────────────────────── */
@@ -19,11 +43,40 @@ body {
   position: relative;
 }
 
+@keyframes drawerFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.drawer-backdrop-enter {
+  animation: drawerFadeIn 180ms ease-out;
+}
+
+.drawer-panel-enter {
+  animation: drawerSlideIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .navbar-inner {
   min-height: 78px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -43,17 +96,65 @@ body {
 }
 
 .navbar-title {
+  font-family: var(--pegasus-font-display);
   font-size: 20px;
   color: #ffffff;
   margin: 0;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .navbar-subtitle {
+  font-family: var(--pegasus-font-ui);
   font-size: 13px;
   color: #d2ddff;
   margin: 0;
   font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.pegasus-page-title {
+  font-family: var(--pegasus-font-display);
+  letter-spacing: 0.02em;
+}
+
+.pegasus-card {
+  background: var(--pegasus-card-bg);
+  border: 1px solid var(--pegasus-card-border);
+  box-shadow: var(--pegasus-soft-shadow);
+}
+
+.pegasus-block {
+  background: #f9fbff;
+  border: 1px solid #d3dff3;
+  box-shadow: 0 4px 12px rgba(17, 43, 90, 0.05);
+}
+
+.pegasus-section-title {
+  font-family: var(--pegasus-font-display);
+  letter-spacing: 0.01em;
+}
+
+.pegasus-table-head {
+  background: linear-gradient(90deg, #e9f0fb 0%, #f1f6ff 100%);
+}
+
+/* ── Global Footer ─────────────────────────── */
+.global-footer {
+  min-height: 34px;
+  background-color: #0d1652;
+  border-top: 1px solid #1a3a8c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+}
+
+.global-footer-text {
+  margin: 0;
+  font-size: 12px;
+  color: #d2ddff;
+  text-align: center;
 }
  
 /* ── Page layout ────────────────────────────── */

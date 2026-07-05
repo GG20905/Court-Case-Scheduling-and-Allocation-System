@@ -1,18 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
 import { getStoredAuthToken } from '../utils/auth';
-
-const navItems = ['Dashboard', 'Cases', 'Schedule', 'Documents'];
-
-const THEME = {
-	pageBg: '#f5f7fc',
-	navPrimary: '#0d1652',
-	navText: '#d2ddff',
-	accent: '#1a3a8c',
-	panel: '#eef2fa',
-	border: '#a8bfe0',
-};
+import JudgePageShell, { JUDGE_THEME } from '../components/JudgePageShell';
 
 const toMonthKey = (value) => {
 	const date = new Date(value);
@@ -21,13 +9,12 @@ const toMonthKey = (value) => {
 };
 
 export default function JudgeDocument() {
-	const navigate = useNavigate();
-	const [activeNav, setActiveNav] = useState('Documents');
 	const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7));
 	const [searchTerm, setSearchTerm] = useState('');
 	const [documents, setDocuments] = useState([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [fetchError, setFetchError] = useState('');
+	const [actionError, setActionError] = useState('');
 
 	useEffect(() => {
 		const token = getStoredAuthToken();
@@ -40,6 +27,7 @@ export default function JudgeDocument() {
 		const fetchDocuments = async () => {
 			setIsLoading(true);
 			setFetchError('');
+			setActionError('');
 
 			try {
 				const casesRes = await fetch('/api/cases', {
@@ -73,6 +61,8 @@ export default function JudgeDocument() {
 							type: doc.document_type || 'Unspecified',
 							uploadedAt: doc.created_at || doc.upload_date,
 							uploadedBy: doc.uploaded_by_name || 'Unknown uploader',
+							sharedAt: doc.shared_at || null,
+							sharedByAdminName: doc.shared_by_admin_name || '',
 						}));
 					})
 				);
@@ -90,7 +80,7 @@ export default function JudgeDocument() {
 
 	const filteredDocs = useMemo(() => {
 		return documents.filter((doc) => {
-			const sameMonth = toMonthKey(doc.uploadedAt) === monthFilter;
+			const sameMonth = !monthFilter || toMonthKey(doc.uploadedAt) === monthFilter;
 			const matchesSearch =
 				doc.caseId.toLowerCase().includes(searchTerm.toLowerCase()) ||
 				doc.caseTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -98,6 +88,39 @@ export default function JudgeDocument() {
 			return sameMonth && matchesSearch;
 		});
 	}, [documents, monthFilter, searchTerm]);
+
+	const handleDownload = async (documentId, fallbackName) => {
+		const token = getStoredAuthToken();
+		if (!token) {
+			setActionError('Session expired. Please login again.');
+			return;
+		}
+
+		setActionError('');
+
+		try {
+			const response = await fetch(`/api/documents/${documentId}/download`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+
+			if (!response.ok) {
+				const payload = await response.json().catch(() => ({}));
+				throw new Error(payload.message || 'Unable to download this document.');
+			}
+
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = fallbackName || 'document';
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			window.URL.revokeObjectURL(url);
+		} catch (error) {
+			setActionError(error.message || 'Unable to download this document.');
+		}
+	};
 
 	const docsByCase = useMemo(() => {
 		const grouped = new Map();
@@ -111,87 +134,45 @@ export default function JudgeDocument() {
 	}, [filteredDocs]);
 
 	return (
-		<div style={{ fontFamily: "'Segoe UI', sans-serif", minHeight: '100vh', backgroundColor: THEME.pageBg }}>
-			<Navbar />
-
-			<nav
-				style={{
-					backgroundColor: THEME.navPrimary,
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					gap: '12px',
-					padding: '0 24px',
-					height: '60px',
-				}}
-			>
-				{navItems.map((item) => (
-					<button
-						key={item}
-						onClick={() => {
-							setActiveNav(item);
-							if (item === 'Dashboard') navigate('/dashboard/judge');
-							if (item === 'Cases') navigate('/dashboard/judge/cases');
-							if (item === 'Schedule') navigate('/dashboard/judge/schedule');
-							if (item === 'Documents') navigate('/dashboard/judge/documents');
-						}}
+		<JudgePageShell
+			activeNav="Documents"
+			sidebarTitle="Judge Panel"
+			sidebarItems={[{ key: 'month', label: 'Month filter' }]}
+			activeSidebarKey="month"
+			onSidebarSelect={() => {}}
+				topNavExtra={(
+				<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+						<label style={{ color: JUDGE_THEME.navText, fontSize: '12px' }}>Month</label>
+					<input
+						type="month"
+						value={monthFilter}
+						onChange={(e) => setMonthFilter(e.target.value)}
 						style={{
-							background: activeNav === item ? THEME.accent : 'transparent',
-							color: activeNav === item ? '#fff' : THEME.navText,
-							border: 'none',
-							borderRadius: '6px',
-							padding: '8px 22px',
-							fontSize: '14px',
-							fontWeight: activeNav === item ? 600 : 400,
-							cursor: 'pointer',
-						}}
-					>
-						{item}
-					</button>
-				))}
-			</nav>
-
-			<div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)' }}>
-				<aside
-					style={{
-						width: '190px',
-						backgroundColor: THEME.panel,
-						borderRight: `1px solid ${THEME.border}`,
-						padding: '20px 0',
-						flexShrink: 0,
-					}}
-				>
-					<p
-						style={{
+							padding: '6px 8px',
+							borderRadius: '8px',
+							border: `1px solid ${JUDGE_THEME.border}`,
+							backgroundColor: '#fff',
 							fontSize: '12px',
-							fontWeight: 700,
-							color: THEME.accent,
-							padding: '6px 20px 4px',
-							letterSpacing: '0.04em',
-							textTransform: 'uppercase',
 						}}
-					>
-						Documents
-					</p>
-					<div style={{ padding: '8px 20px' }}>
-						<label style={{ display: 'block', fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>Month</label>
-						<input
-							type="month"
-							value={monthFilter}
-							onChange={(e) => setMonthFilter(e.target.value)}
+					/>
+						<button
+							type="button"
+							onClick={() => setMonthFilter('')}
 							style={{
-								width: '100%',
-								padding: '8px',
-								border: `1px solid ${THEME.border}`,
+								padding: '6px 8px',
 								borderRadius: '8px',
+								border: `1px solid ${JUDGE_THEME.border}`,
 								backgroundColor: '#fff',
+								fontSize: '12px',
+								cursor: 'pointer',
 							}}
-						/>
-					</div>
-				</aside>
-
-				<main style={{ flex: 1, padding: '28px 32px' }}>
-					<h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>Monthly Documents Outlook</h2>
+						>
+							All
+						</button>
+				</div>
+			)}
+		>
+					<h2 className="pegasus-page-title" style={{ fontSize: '22px', fontWeight: 700, color: '#1E2A45', marginBottom: '8px' }}>Monthly Documents Outlook</h2>
 					<p style={{ color: '#64748B', marginTop: 0, marginBottom: '16px' }}>
 						Documents are grouped by the case they are attached to.
 					</p>
@@ -199,6 +180,12 @@ export default function JudgeDocument() {
 					{fetchError && (
 						<div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
 							{fetchError}
+						</div>
+					)}
+
+					{actionError && (
+						<div style={{ marginBottom: '14px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5', color: '#B91C1C', borderRadius: '8px', padding: '10px 12px' }}>
+							{actionError}
 						</div>
 					)}
 
@@ -212,45 +199,43 @@ export default function JudgeDocument() {
 							maxWidth: '440px',
 							marginBottom: '16px',
 							padding: '10px 12px',
-							border: `1px solid ${THEME.border}`,
+							border: `1px solid ${JUDGE_THEME.border}`,
 							borderRadius: '8px',
 							fontSize: '14px',
 						}}
 					/>
 
 					{isLoading && (
-						<div style={{ backgroundColor: '#fff', border: `1px solid ${THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+						<div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
 							<p style={{ margin: 0, color: '#64748B' }}>Loading documents...</p>
 						</div>
 					)}
 
 					{!isLoading && docsByCase.length === 0 && (
-						<div style={{ backgroundColor: '#fff', border: `1px solid ${THEME.border}`, borderRadius: '10px', padding: '20px' }}>
+						<div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
 							<p style={{ margin: 0, color: '#64748B' }}>No documents found for this month/filter.</p>
 						</div>
 					)}
 
 					{!isLoading && docsByCase.map((group) => (
 						<div
+							className="pegasus-block"
 							key={group.caseId}
 							style={{
-								backgroundColor: '#fff',
-								border: `1px solid ${THEME.border}`,
-								borderRadius: '10px',
-								boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+								borderRadius: '12px',
 								marginBottom: '14px',
 								overflow: 'hidden',
 							}}
 						>
-							<div style={{ backgroundColor: THEME.panel, padding: '10px 14px', borderBottom: `1px solid ${THEME.border}` }}>
-								<p style={{ margin: 0, color: THEME.accent, fontWeight: 700 }}>{group.caseId}</p>
+							<div style={{ backgroundColor: JUDGE_THEME.panel, padding: '10px 14px', borderBottom: `1px solid ${JUDGE_THEME.border}` }}>
+								<p style={{ margin: 0, color: JUDGE_THEME.accent, fontWeight: 700 }}>{group.caseId}</p>
 								<p style={{ margin: '2px 0 0', color: '#334155', fontSize: '13px' }}>{group.caseTitle}</p>
 							</div>
 
 							<table style={{ width: '100%', borderCollapse: 'collapse' }}>
 								<thead>
-									<tr style={{ backgroundColor: '#F8FAFC' }}>
-										{['Document', 'Type', 'Uploaded by', 'Date attached'].map((h) => (
+									<tr className="pegasus-table-head">
+										{['Document', 'Type', 'Uploaded by', 'Date attached', 'Shared on', 'Actions'].map((h) => (
 											<th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
 										))}
 									</tr>
@@ -262,14 +247,33 @@ export default function JudgeDocument() {
 											<td style={{ padding: '10px 14px', color: '#475569' }}>{doc.type}</td>
 											<td style={{ padding: '10px 14px', color: '#475569' }}>{doc.uploadedBy}</td>
 											<td style={{ padding: '10px 14px', color: '#475569' }}>{new Date(doc.uploadedAt).toLocaleDateString()}</td>
+											<td style={{ padding: '10px 14px', color: '#475569' }}>
+												{doc.sharedAt ? new Date(doc.sharedAt).toLocaleDateString() : '-'}
+												{doc.sharedByAdminName ? ` by ${doc.sharedByAdminName}` : ''}
+											</td>
+											<td style={{ padding: '10px 14px' }}>
+												<button
+													type="button"
+													onClick={() => handleDownload(doc.id, doc.docName)}
+													style={{
+														border: `1px solid ${JUDGE_THEME.border}`,
+														backgroundColor: '#fff',
+														borderRadius: '6px',
+														padding: '6px 10px',
+														fontSize: '12px',
+														color: JUDGE_THEME.accent,
+														cursor: 'pointer',
+													}}
+												>
+												 Download
+												</button>
+											</td>
 										</tr>
 									))}
 								</tbody>
 							</table>
 						</div>
 					))}
-				</main>
-			</div>
-		</div>
+		</JudgePageShell>
 	);
 }
