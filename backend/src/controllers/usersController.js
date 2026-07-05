@@ -22,6 +22,26 @@ const passwordResetTokenTtlMinutes = Number(process.env.PASSWORD_RESET_TOKEN_TTL
 const passwordResetMinIntervalSeconds = Number(process.env.PASSWORD_RESET_MIN_INTERVAL_SECONDS || 60);
 const frontendBaseUrl = (process.env.CLIENT_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const validRoles = ['litigant', 'advocate', 'judge', 'admin'];
+const validJudgeSpecialties = [
+  'Environment and Land Court (ELC)',
+  'Employment and Labour Relations Court (ELRC)',
+  "Kadhi's Courts",
+  'Family and Children Division',
+  'Commercial and Tax Division',
+  'Constitutional and Human Rights Division',
+  'Criminal Division',
+  'Anti-Corruption and Economic Crimes Division',
+  'Judicial Review Division',
+  'Admiralty Division',
+  'Civil Division',
+  'Sexual and Gender-Based Violence (SGBV) Courts',
+  "Children's Courts",
+  'Counter-Terrorism Courts',
+  'JKIA Courts',
+];
+const judgeSpecialtyLookup = new Map(
+  validJudgeSpecialties.map((value) => [String(value).trim().toLowerCase(), value])
+);
 
 const normalizeLoginRoleSelection = (rawRole) => {
   const value = String(rawRole || '').trim().toLowerCase();
@@ -50,6 +70,11 @@ const isLoginRoleAllowedForUser = (requestedRole, userRole) => {
   }
 
   return requestedRole === userRole;
+};
+
+const normalizeJudgeSpecialty = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return judgeSpecialtyLookup.get(normalized) || '';
 };
 
 const generateToken = (user) => {
@@ -99,7 +124,17 @@ const validateTwoFactorToken = (twoFactorToken) => {
   return { ok: true, decoded };
 };
 
-const insertRoleRecord = async (client, role, user, fullName, email, hashedPassword, participantType, courtStation) => {
+const insertRoleRecord = async (
+  client,
+  role,
+  user,
+  fullName,
+  email,
+  hashedPassword,
+  participantType,
+  courtStation,
+  judgeSpecialty
+) => {
   if (role === 'admin') {
     return client.query(
       `INSERT INTO court_administrators (user_id, full_name, email, password)
@@ -110,9 +145,9 @@ const insertRoleRecord = async (client, role, user, fullName, email, hashedPassw
 
   if (role === 'judge') {
     return client.query(
-      `INSERT INTO judges (user_id, full_name, email, password, court_station)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [user.user_id, fullName, email, hashedPassword, courtStation]
+      `INSERT INTO judges (user_id, full_name, email, password, court_station, specialty)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [user.user_id, fullName, email, hashedPassword, courtStation, judgeSpecialty]
     );
   }
 
@@ -251,7 +286,16 @@ const issueAndSendTwoFactorCode = async (user) => {
 const register = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { full_name, email, password, role, participant_type, court_station } = req.body;
+    const {
+      full_name,
+      email,
+      password,
+      role,
+      participant_type,
+      court_station,
+      judge_specialty,
+      judge_speciality,
+    } = req.body;
 
     if (!full_name || !email || !password || !role) {
       return res.status(400).json({ success: false, message: 'full_name, email, password and role are required.' });
@@ -267,6 +311,14 @@ const register = async (req, res) => {
 
     if (role === 'judge' && !court_station) {
       return res.status(400).json({ success: false, message: 'court_station is required for judge.' });
+    }
+
+    const normalizedJudgeSpecialty = normalizeJudgeSpecialty(judge_specialty || judge_speciality);
+    if (role === 'judge' && !normalizedJudgeSpecialty) {
+      return res.status(400).json({
+        success: false,
+        message: `judge_specialty is required and must be one of: ${validJudgeSpecialties.join(', ')}.`,
+      });
     }
 
     await client.query('BEGIN');
@@ -287,7 +339,17 @@ const register = async (req, res) => {
     );
     const user = userResult.rows[0];
 
-    await insertRoleRecord(client, role, user, full_name, email, hashedPassword, participant_type, court_station);
+    await insertRoleRecord(
+      client,
+      role,
+      user,
+      full_name,
+      email,
+      hashedPassword,
+      participant_type,
+      court_station,
+      normalizedJudgeSpecialty
+    );
 
     await client.query('COMMIT');
     const token = generateToken(user);

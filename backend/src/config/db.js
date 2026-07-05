@@ -90,6 +90,14 @@ const initializeDatabase = async () => {
       `);
     }
 
+    const judgesTableCheck = await client.query(`SELECT to_regclass('public.judges') AS judges_table`);
+    if (judgesTableCheck.rows[0]?.judges_table) {
+      await client.query(`
+        ALTER TABLE judges
+        ADD COLUMN IF NOT EXISTS specialty VARCHAR(140);
+      `);
+    }
+
     const hearingsTableCheck = await client.query(`SELECT to_regclass('public.hearings') AS hearings_table`);
     if (hearingsTableCheck.rows[0]?.hearings_table) {
       await client.query(`
