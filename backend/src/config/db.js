@@ -116,18 +116,18 @@ const initializeDatabase = async () => {
     }
 
     await ensureDocumentSharingSchema(client);
-    console.log('✅ Connected to PostgreSQL database');
+    console.log('Connected to PostgreSQL database');
   } catch (err) {
-    console.error('❌ Database connection error:', err.message);
-    console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
+    console.error('Database connection error:', err.message);
+    console.error('Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
   } finally {
     client.release();
   }
 };
 
 initializeDatabase().catch((err) => {
-  console.error('❌ Database initialization failed:', err.message);
-  console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
+  console.error('Database initialization failed:', err.message);
+  console.error('Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
 });
 
 module.exports = pool;
