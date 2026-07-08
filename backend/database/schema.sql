@@ -40,6 +40,7 @@ CREATE TABLE judges (
   email         VARCHAR(150) NOT NULL UNIQUE,
   password      VARCHAR(255) NOT NULL,
   court_station VARCHAR(100) NOT NULL,
+  specialty     VARCHAR(140) NOT NULL,
   created_at    TIMESTAMP DEFAULT NOW()
 );
 

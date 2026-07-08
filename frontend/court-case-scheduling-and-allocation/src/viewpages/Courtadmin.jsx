@@ -19,13 +19,20 @@ const parseDate = (value) => {
   return parsed;
 };
 
-const getFcfsPriority = (ageDays) => {
-  if (ageDays >= 14) return 'Urgent';
-  if (ageDays >= 7) return 'High';
+const priorityWeight = (priority) => {
+  const normalized = String(priority || '').toLowerCase();
+  if (normalized === 'urgent') return 3;
+  if (normalized === 'high') return 2;
+  return 1;
+};
+
+const priorityLabel = (weight) => {
+  if (weight >= 3) return 'Urgent';
+  if (weight === 2) return 'High';
   return 'Normal';
 };
 
-const getFcfsPriorityColor = (priority) => {
+const getPriorityColor = (priority) => {
   const normalized = String(priority || '').toLowerCase();
   if (normalized === 'urgent') return '#B91C1C';
   if (normalized === 'high') return '#B45309';
@@ -35,6 +42,10 @@ const getFcfsPriorityColor = (priority) => {
 export default function AdminJudgeDashboard() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState('Overview');
+  const [prioritySortMode, setPrioritySortMode] = useState(() => {
+    const stored = window.localStorage.getItem('adminPrioritySortMode');
+    return stored === 'oldest' ? 'oldest' : 'priority';
+  });
   const [summary, setSummary] = useState(null);
   const [cases, setCases] = useState([]);
   const [hearings, setHearings] = useState([]);
@@ -76,6 +87,10 @@ export default function AdminJudgeDashboard() {
     loadDashboardData();
   }, []);
 
+  useEffect(() => {
+    window.localStorage.setItem('adminPrioritySortMode', prioritySortMode);
+  }, [prioritySortMode]);
+
   const stats = useMemo(() => {
     return {
       totalCases: toInt(summary?.cases?.total_cases),
@@ -101,7 +116,7 @@ export default function AdminJudgeDashboard() {
     }));
   }, [cases]);
 
-  const fcfsAgingQueue = useMemo(() => {
+  const openCaseQueue = useMemo(() => {
     const nowMs = Date.now();
 
     return cases
@@ -112,22 +127,43 @@ export default function AdminJudgeDashboard() {
       .map((item) => {
         const createdDate = parseDate(item.filing_date || item.created_at) || new Date();
         const ageDays = Math.max(0, Math.floor((nowMs - createdDate.getTime()) / (24 * 60 * 60 * 1000)));
-        const fcfsPriority = getFcfsPriority(ageDays);
+        const casePriority = priorityLabel(priorityWeight(item.priority));
 
         return {
           caseId: item.case_id,
           title: item.case_title || 'Untitled case',
-          fcfsPriority,
-          fcfsPriorityColor: getFcfsPriorityColor(fcfsPriority),
+          casePriority,
+          casePriorityColor: getPriorityColor(casePriority),
+          ageDays,
           assignmentStatus: String(item.assignment_status || '').toLowerCase(),
           assignedJudgeName: item.assigned_judge_name || '',
           rejectionReason: String(item.rejection_reason || '').trim(),
           createdAt: createdDate.getTime(),
         };
       })
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .slice(0, 8);
+      .sort((a, b) => a.createdAt - b.createdAt);
   }, [cases]);
+
+  const priorityCases = useMemo(() => {
+    return [...openCaseQueue]
+      .sort((a, b) => {
+        const byPriority = priorityWeight(b.casePriority) - priorityWeight(a.casePriority);
+        if (byPriority !== 0) return byPriority;
+        return a.createdAt - b.createdAt;
+      })
+      .slice(0, 8);
+  }, [openCaseQueue]);
+
+  const caseAgeQueue = useMemo(() => {
+    return [...openCaseQueue]
+      .sort((a, b) => {
+        if (b.ageDays !== a.ageDays) return b.ageDays - a.ageDays;
+        return a.createdAt - b.createdAt;
+      })
+      .slice(0, 8);
+  }, [openCaseQueue]);
+
+  const priorityPanelCases = prioritySortMode === 'oldest' ? caseAgeQueue : priorityCases;
 
   const sidebarItems = [
     { key: 'Overview', label: 'Overview' },
@@ -203,6 +239,7 @@ export default function AdminJudgeDashboard() {
         judgeId: judge.judge_id,
         name: judge.full_name || 'Unknown judge',
         station: judge.court_station || '-',
+        specialty: judge.specialty || '-',
         email: judge.email || '-',
         activeCases,
         statusLabel,
@@ -262,11 +299,13 @@ export default function AdminJudgeDashboard() {
 
             <section className="pegasus-block" style={{ borderRadius: '12px', padding: '14px' }}>
               <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Priority Cases</h3>
-             
+              <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#64748B' }}>
+                Older open cases are ranked higher priority (first come, first served).
+              </p>
               <div style={{ marginTop: '10px' }}>
-                {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading FCFS queue...</p>}
-                {!isLoading && fcfsAgingQueue.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No open cases in queue.</p>}
-                {!isLoading && fcfsAgingQueue.map((item) => (
+                {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading priority queue...</p>}
+                {!isLoading && priorityPanelCases.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No open cases in queue.</p>}
+                {!isLoading && priorityPanelCases.map((item) => (
                   <button
                     key={`fcfs-slot-${item.caseId}`}
                     type="button"
@@ -283,8 +322,11 @@ export default function AdminJudgeDashboard() {
                     }}
                   >
                     <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>{item.title}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: item.fcfsPriorityColor, fontWeight: 700 }}>
-                      Priority: {item.fcfsPriority}
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: item.casePriorityColor, fontWeight: 700 }}>
+                      Priority: {item.casePriority}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#475569' }}>
+                      Age: {item.ageDays} day{item.ageDays === 1 ? '' : 's'}
                     </p>
                     {(item.assignmentStatus === 'approved' || item.assignmentStatus === 'rejected') && (
                       <p
@@ -304,6 +346,39 @@ export default function AdminJudgeDashboard() {
                         Reason: {item.rejectionReason}
                       </p>
                     )}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="pegasus-block" style={{ borderRadius: '12px', padding: '14px' }}>
+              <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Case Age Queue</h3>
+              <div style={{ marginTop: '10px' }}>
+                {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading age queue...</p>}
+                {!isLoading && caseAgeQueue.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No open cases in queue.</p>}
+                {!isLoading && caseAgeQueue.map((item) => (
+                  <button
+                    key={`age-slot-${item.caseId}`}
+                    type="button"
+                    onClick={() => navigate(`/dashboard/admin/cases?focusCaseId=${item.caseId}`)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '8px',
+                      backgroundColor: '#fff',
+                      padding: '10px 12px',
+                      marginBottom: '8px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>{item.title}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#475569' }}>
+                      Days since registration: {item.ageDays}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: item.casePriorityColor, fontWeight: 700 }}>
+                      Priority: {item.casePriority}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -482,7 +557,7 @@ export default function AdminJudgeDashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
               <thead>
                 <tr className="pegasus-table-head">
-                  {['Judge', 'Station', 'Email', 'Active cases', 'Status'].map((header) => (
+                  {['Judge', 'Station', 'Specialty', 'Email', 'Active cases', 'Status'].map((header) => (
                     <th key={header} style={{ textAlign: 'left', padding: '10px 12px', fontSize: '12px', color: '#334155' }}>{header}</th>
                   ))}
                 </tr>
@@ -490,13 +565,14 @@ export default function AdminJudgeDashboard() {
               <tbody>
                 {!isLoading && judgeStatusRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: '12px', color: '#64748B' }}>No judges found.</td>
+                    <td colSpan={6} style={{ padding: '12px', color: '#64748B' }}>No judges found.</td>
                   </tr>
                 )}
                 {judgeStatusRows.map((judge) => (
                   <tr key={judge.judgeId} style={{ borderTop: '1px solid #E2E8F0' }}>
                     <td style={{ padding: '10px 12px', color: '#1E293B' }}>{judge.name}</td>
                     <td style={{ padding: '10px 12px', color: '#475569' }}>{judge.station}</td>
+                    <td style={{ padding: '10px 12px', color: '#475569' }}>{judge.specialty}</td>
                     <td style={{ padding: '10px 12px', color: '#475569' }}>{judge.email}</td>
                     <td style={{ padding: '10px 12px', color: '#475569', fontWeight: 700 }}>{judge.activeCases}</td>
                     <td style={{ padding: '10px 12px', color: judge.statusColor, fontWeight: 700 }}>{judge.statusLabel}</td>

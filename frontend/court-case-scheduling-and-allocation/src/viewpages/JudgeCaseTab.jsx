@@ -3,9 +3,13 @@ import { authFetchJson } from '../utils/api';
 import JudgePageShell, { JUDGE_THEME } from '../components/JudgePageShell';
 
 const REJECTION_REASON_OPTIONS = [
-  { value: 'schedule', label: 'Schedule conflict' },
-  { value: 'specialty', label: 'Outside specialty' },
-  { value: 'other', label: 'Other' },
+  { value: 'conflict_of_interest', label: 'Conflict of Interest' },
+  { value: 'excessive_workload', label: 'Excessive Workload' },
+  { value: 'outside_jurisdiction', label: 'Outside Jurisdiction' },
+  { value: 'prior_involvement', label: 'Prior Involvement' },
+  { value: 'leave_unavailability', label: 'Leave/Unavailability' },
+  { value: 'scheduling_conflict', label: 'Scheduling Conflict' },
+  { value: 'other', label: 'Other (Specify)' },
 ];
 
 const toDisplayStatus = (value) => {
@@ -137,14 +141,14 @@ export default function JudgeCaseTab() {
     setActionError('');
     setActionMessage('');
     setPendingRejectItem(item);
-    setRejectionReasonType('schedule');
+    setRejectionReasonType('conflict_of_interest');
     setOtherRejectionReason('');
   };
 
   const closeRejectDialog = () => {
     if (busyAssignmentId) return;
     setPendingRejectItem(null);
-    setRejectionReasonType('schedule');
+    setRejectionReasonType('conflict_of_interest');
     setOtherRejectionReason('');
   };
 
@@ -156,11 +160,7 @@ export default function JudgeCaseTab() {
     }
 
     let rejectionReason = '';
-    if (rejectionReasonType === 'schedule') {
-      rejectionReason = 'Schedule conflict';
-    } else if (rejectionReasonType === 'specialty') {
-      rejectionReason = 'Case outside specialty';
-    } else {
+    if (rejectionReasonType === 'other') {
       const typed = otherRejectionReason.trim();
       if (!typed) {
         setActionError('Please provide a reason when selecting Other.');
@@ -168,6 +168,14 @@ export default function JudgeCaseTab() {
         return;
       }
       rejectionReason = `Other: ${typed}`;
+    } else {
+      const selected = REJECTION_REASON_OPTIONS.find((option) => option.value === rejectionReasonType);
+      rejectionReason = selected?.label || '';
+      if (!rejectionReason) {
+        setActionError('Please select a valid rejection reason.');
+        setActionMessage('');
+        return;
+      }
     }
 
     setActionError('');
@@ -186,7 +194,7 @@ export default function JudgeCaseTab() {
 
       setActionMessage('Assignment rejected.');
       setPendingRejectItem(null);
-      setRejectionReasonType('schedule');
+      setRejectionReasonType('conflict_of_interest');
       setOtherRejectionReason('');
       await loadData();
     } catch (error) {
@@ -304,7 +312,7 @@ export default function JudgeCaseTab() {
                 <tbody>
                   {filteredCases.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: '16px 14px', color: '#64748B' }}>No cases found.</td>
+                      <td colSpan={8} style={{ padding: '16px 14px', color: '#64748B' }}>No cases found.</td>
                     </tr>
                   )}
                   {filteredCases.map((item) => (

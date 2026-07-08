@@ -8,6 +8,24 @@ const ROLES = [
   { label: 'Judge', value: 'judge' },
 ];
 
+const JUDGE_SPECIALTIES = [
+  'Environment and Land Court (ELC)',
+  'Employment and Labour Relations Court (ELRC)',
+  "Kadhi's Courts",
+  'Family and Children Division',
+  'Commercial and Tax Division',
+  'Constitutional and Human Rights Division',
+  'Criminal Division',
+  'Anti-Corruption and Economic Crimes Division',
+  'Judicial Review Division',
+  'Admiralty Division',
+  'Civil Division',
+  'Sexual and Gender-Based Violence (SGBV) Courts',
+  "Children's Courts",
+  'Counter-Terrorism Courts',
+  'JKIA Courts',
+];
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     email: '',
@@ -16,6 +34,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     role: '',
     courtStation: '',
+    judgeSpecialty: '',
   });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,13 +45,15 @@ export default function RegisterPage() {
 
   const handleSubmit = async (event) => {
     if (event) event.preventDefault();
-    const { email, name, password, confirmPassword, role, courtStation } = form;
+    const { email, name, password, confirmPassword, role, courtStation, judgeSpecialty } = form;
     if (!email || !name || !password || !confirmPassword || !role)
       return setError('Please fill in all fields.');
     if (password !== confirmPassword)
       return setError('Passwords do not match.');
     if (role === 'judge' && !courtStation)
       return setError('Court station is required for judges.');
+    if (role === 'judge' && !judgeSpecialty)
+      return setError('Specialty is required for judges.');
     setError('');
 
     const payload = {
@@ -48,6 +69,7 @@ export default function RegisterPage() {
 
     if (role === 'judge') {
       payload.court_station = courtStation;
+      payload.judge_specialty = judgeSpecialty;
     }
 
     try {
@@ -92,7 +114,19 @@ export default function RegisterPage() {
           <input type="password" className="field-input" value={form.confirmPassword} onChange={handleChange('confirmPassword')} />
 
           <label className="field-label">Role</label>
-          <select className="field-select" value={form.role} onChange={handleChange('role')}>
+          <select
+            className="field-select"
+            value={form.role}
+            onChange={(event) => {
+              const nextRole = event.target.value;
+              setForm((prev) => ({
+                ...prev,
+                role: nextRole,
+                courtStation: nextRole === 'judge' ? prev.courtStation : '',
+                judgeSpecialty: nextRole === 'judge' ? prev.judgeSpecialty : '',
+              }));
+            }}
+          >
             <option value="" disabled>Select a role</option>
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -109,6 +143,18 @@ export default function RegisterPage() {
                 onChange={handleChange('courtStation')}
                 placeholder="e.g. Nairobi High Court"
               />
+
+              <label className="field-label">Specialty</label>
+              <select
+                className="field-select"
+                value={form.judgeSpecialty}
+                onChange={handleChange('judgeSpecialty')}
+              >
+                <option value="" disabled>Select judge specialty</option>
+                {JUDGE_SPECIALTIES.map((specialty) => (
+                  <option key={specialty} value={specialty}>{specialty}</option>
+                ))}
+              </select>
             </>
           )}
 
