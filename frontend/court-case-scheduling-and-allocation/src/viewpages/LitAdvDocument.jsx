@@ -5,6 +5,7 @@ import LitigantPageShell, { LITIGANT_THEME } from '../components/LitigantPageShe
 
 const sidebarItems = [
   { key: 'upload', label: 'Upload document' },
+  { key: 'rulings', label: 'Rulings' },
 ];
 
 const DOCUMENT_TYPES = ['Pleading', 'Evidence', 'Affidavit', 'Motion', 'Order', 'Ruling', 'Other'];
@@ -39,6 +40,8 @@ export default function LitAdvDocument() {
     description: '',
   });
   const [file, setFile] = useState(null);
+  const [rulings, setRulings] = useState([]);
+  const [isRulingsLoading, setIsRulingsLoading] = useState(true);
 
   const fetchCasesAndDocuments = async () => {
     const casesRes = await authFetchJson('/api/cases');
@@ -60,8 +63,11 @@ export default function LitAdvDocument() {
       })
     );
 
+    const rulingsRes = await authFetchJson('/api/rulings');
+
     setCases(caseList);
     setDocuments(docsResults.flat());
+    setRulings(Array.isArray(rulingsRes.data) ? rulingsRes.data : []);
 
     if (!form.caseId && caseList.length > 0) {
       setForm((prev) => ({ ...prev, caseId: String(caseList[0].case_id) }));
@@ -79,6 +85,7 @@ export default function LitAdvDocument() {
         setFetchError(error.message || 'Failed to load documents.');
       } finally {
         setIsLoading(false);
+        setIsRulingsLoading(false);
       }
     };
 
@@ -202,6 +209,37 @@ export default function LitAdvDocument() {
     }
   };
 
+  const handleDownloadRulingDocument = async (rulingId, fallbackName) => {
+    const token = getStoredAuthToken();
+    if (!token) {
+      setSubmitError('Session expired. Please login again.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/rulings/${rulingId}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to download ruling document.');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fallbackName || 'ruling.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setSubmitError(error.message || 'Failed to download ruling document.');
+    }
+  };
+
   return (
     <LitigantPageShell
       activeNav="Documents"
@@ -233,6 +271,7 @@ export default function LitAdvDocument() {
             </div>
           )}
 
+          {activeSidebar === 'upload' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px', marginBottom: '16px' }}>
             <section className="pegasus-block" style={{ borderRadius: '12px', padding: '16px' }}>
               <h3 className="pegasus-section-title" style={{ margin: '0 0 12px', fontSize: '16px', color: '#1E2A45' }}>Upload document</h3>
@@ -330,7 +369,9 @@ export default function LitAdvDocument() {
               ))}
             </section>
           </div>
+          )}
 
+          {activeSidebar === 'upload' && (
           <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
             <input
               type="month"
@@ -346,20 +387,21 @@ export default function LitAdvDocument() {
               style={{ width: '100%', maxWidth: '380px', padding: '10px 12px', border: `1px solid ${LITIGANT_THEME.border}`, borderRadius: '8px' }}
             />
           </div>
+          )}
 
-          {isLoading && (
+          {activeSidebar === 'upload' && isLoading && (
             <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
               <p style={{ margin: 0, color: '#64748B' }}>Loading documents...</p>
             </div>
           )}
 
-          {!isLoading && docsByCase.length === 0 && (
+          {activeSidebar === 'upload' && !isLoading && docsByCase.length === 0 && (
             <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
               <p style={{ margin: 0, color: '#64748B' }}>No documents found for this month/filter.</p>
             </div>
           )}
 
-          {!isLoading && docsByCase.map((group) => (
+          {activeSidebar === 'upload' && !isLoading && docsByCase.map((group) => (
             <div
               className="pegasus-block"
               key={group.caseId}
@@ -411,6 +453,60 @@ export default function LitAdvDocument() {
               </table>
             </div>
           ))}
+
+          {activeSidebar === 'rulings' && (
+            <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr className="pegasus-table-head">
+                    {['Case', 'Judge', 'Date', 'Content'].map((header) => (
+                      <th key={header} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', color: '#334155' }}>{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {isRulingsLoading && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '12px 14px', color: '#64748B' }}>Loading rulings...</td>
+                    </tr>
+                  )}
+                  {!isRulingsLoading && rulings.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '12px 14px', color: '#64748B' }}>No published rulings for your cases yet.</td>
+                    </tr>
+                  )}
+                  {!isRulingsLoading && rulings.map((item) => (
+                    <tr key={item.ruling_id} style={{ borderTop: '1px solid #E2E8F0' }}>
+                      <td style={{ padding: '10px 14px', color: '#1E293B', fontWeight: 600 }}>CASE-{item.case_id} - {item.case_title || '-'}</td>
+                      <td style={{ padding: '10px 14px', color: '#475569' }}>{item.judge_name || '-'}</td>
+                      <td style={{ padding: '10px 14px', color: '#475569' }}>{getDisplayDate(item.ruling_date)}</td>
+                      <td style={{ padding: '10px 14px', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                        {item.ruling_document_path ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadRulingDocument(item.ruling_id, item.ruling_document_name)}
+                            style={{
+                              border: `1px solid ${LITIGANT_THEME.border}`,
+                              backgroundColor: '#fff',
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              fontSize: '12px',
+                              color: LITIGANT_THEME.accent,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Download {item.ruling_document_name || 'ruling'}
+                          </button>
+                        ) : (
+                          item.ruling_text
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
     </LitigantPageShell>
   );
 }

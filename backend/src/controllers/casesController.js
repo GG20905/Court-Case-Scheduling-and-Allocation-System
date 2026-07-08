@@ -281,4 +281,64 @@ const registerCase = async (req, res) => {
   }
 };
 
-module.exports = { createCase, getCases, getCaseCategories, getCaseById, updateCaseStatus, registerCase };
+// DELETE /api/cases/:id  (admin - only expired hearing cases)
+const deleteCase = async (req, res) => {
+  try {
+    const parsedCaseId = parsePositiveIntId(req.params.id);
+    if (!parsedCaseId) {
+      return res.status(400).json({ success: false, message: 'Invalid case ID. It must be a positive integer.' });
+    }
+
+    const caseResult = await pool.query(
+      'SELECT case_id, case_title FROM cases WHERE case_id = $1',
+      [parsedCaseId]
+    );
+
+    if (caseResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Case not found.' });
+    }
+
+    const hearingResult = await pool.query(
+      `SELECT MAX(hearing_date) AS latest_hearing_date
+       FROM hearings
+       WHERE case_id = $1`,
+      [parsedCaseId]
+    );
+
+    const latestHearingDate = hearingResult.rows[0]?.latest_hearing_date;
+    if (!latestHearingDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete this case yet. It has no scheduled hearing date to qualify as expired.',
+      });
+    }
+
+    const isExpiredResult = await pool.query(
+      'SELECT ($1::date < CURRENT_DATE) AS is_expired',
+      [latestHearingDate]
+    );
+
+    if (!isExpiredResult.rows[0]?.is_expired) {
+      return res.status(400).json({
+        success: false,
+        message: 'Case can only be deleted after the latest hearing date has passed.',
+      });
+    }
+
+    const deleted = await pool.query(
+      'DELETE FROM cases WHERE case_id = $1 RETURNING case_id, case_title',
+      [parsedCaseId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Case ${deleted.rows[0].case_title || parsedCaseId} deleted successfully.`,
+      data: deleted.rows[0],
+    });
+  } catch (err) {
+    console.error('deleteCase error:', err);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+module.exports = { createCase, getCases, getCaseCategories, getCaseById, updateCaseStatus, registerCase, deleteCase };

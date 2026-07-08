@@ -1,7 +1,6 @@
 
--- ============================================================
 -- USERS
--- ============================================================
+
 CREATE TABLE users (
   user_id    SERIAL PRIMARY KEY,
   full_name  VARCHAR(150) NOT NULL,
@@ -18,9 +17,9 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- COURT ADMINISTRATORS
--- ============================================================
+
 CREATE TABLE court_administrators (
   admin_id   SERIAL PRIMARY KEY,
   user_id    INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
@@ -30,9 +29,9 @@ CREATE TABLE court_administrators (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- JUDGES
--- ============================================================
+
 CREATE TABLE judges (
   judge_id      SERIAL PRIMARY KEY,
   user_id       INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
@@ -44,9 +43,9 @@ CREATE TABLE judges (
   created_at    TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- LITIGANTS / ADVOCATES
--- ============================================================
+
 CREATE TABLE litigants_advocates (
   participant_id   SERIAL PRIMARY KEY,
   user_id          INT NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
@@ -57,9 +56,9 @@ CREATE TABLE litigants_advocates (
   created_at       TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- CASES
--- ============================================================
+
 CREATE TABLE cases (
   case_id          SERIAL PRIMARY KEY,
   case_title       VARCHAR(200) NOT NULL,
@@ -76,9 +75,8 @@ CREATE TABLE cases (
   updated_at       TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- JUDGE ASSIGNMENTS
--- ============================================================
 CREATE TABLE judge_assignments (
   assignment_id     SERIAL PRIMARY KEY,
   case_id           INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
@@ -92,9 +90,9 @@ CREATE TABLE judge_assignments (
   updated_at        TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- HEARINGS
--- ============================================================
+
 CREATE TABLE hearings (
   hearing_id    SERIAL PRIMARY KEY,
   case_id       INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
@@ -104,7 +102,7 @@ CREATE TABLE hearings (
   hearing_time  TIME NOT NULL,
   hearing_mode  VARCHAR(20) NOT NULL DEFAULT 'physical'
                 CHECK (hearing_mode IN ('physical', 'virtual')),
-  meeting_link  VARCHAR(255),
+  meeting_link  TEXT,
   status        VARCHAR(50) NOT NULL DEFAULT 'requested'
                 CHECK (status IN ('requested', 'scheduled', 'completed', 'cancelled', 'postponed')),
   hearing_notes TEXT,
@@ -112,9 +110,9 @@ CREATE TABLE hearings (
   updated_at    TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- DOCUMENTS
--- ============================================================
+
 CREATE TABLE documents (
   document_id    SERIAL PRIMARY KEY,
   case_id        INT NOT NULL REFERENCES cases(case_id) ON DELETE CASCADE,
@@ -127,9 +125,8 @@ CREATE TABLE documents (
   created_at     TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
 -- DOCUMENT SHARES (admin -> designated judge)
--- ============================================================
+
 CREATE TABLE document_shares (
   share_id            SERIAL PRIMARY KEY,
   document_id         INT NOT NULL UNIQUE REFERENCES documents(document_id) ON DELETE CASCADE,
@@ -141,24 +138,27 @@ CREATE TABLE document_shares (
   updated_at          TIMESTAMP DEFAULT NOW()
 );
 
--- ============================================================
+
 -- RULINGS
--- ============================================================
+
 CREATE TABLE rulings (
   ruling_id    SERIAL PRIMARY KEY,
   case_id      INT NOT NULL UNIQUE REFERENCES cases(case_id) ON DELETE CASCADE,
   judge_id     INT NOT NULL REFERENCES judges(judge_id) ON DELETE CASCADE,
-  ruling_text  TEXT NOT NULL,
+  ruling_text  TEXT,
+  ruling_document_name VARCHAR(255),
+  ruling_document_path VARCHAR(500),
   ruling_date  DATE NOT NULL DEFAULT CURRENT_DATE,
   is_published BOOLEAN NOT NULL DEFAULT FALSE,
   published_at TIMESTAMP,
   created_at   TIMESTAMP DEFAULT NOW(),
-  updated_at   TIMESTAMP DEFAULT NOW()
+  updated_at   TIMESTAMP DEFAULT NOW(),
+  CHECK (ruling_text IS NOT NULL OR ruling_document_path IS NOT NULL)
 );
 
--- ============================================================
+
 -- INDEXES
--- ============================================================
+
 CREATE INDEX idx_users_email          ON users(email);
 CREATE INDEX idx_users_role           ON users(role);
 CREATE INDEX idx_cases_status         ON cases(case_status);
@@ -173,9 +173,9 @@ CREATE INDEX idx_assignments_case     ON judge_assignments(case_id);
 CREATE INDEX idx_assignments_judge    ON judge_assignments(judge_id);
 CREATE INDEX idx_rulings_case         ON rulings(case_id);
 
--- ============================================================
+
 -- AUTO-UPDATE updated_at TRIGGER
--- ============================================================
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap');
 
 :root {
-  --pegasus-font-ui: 'Manrope', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  --pegasus-font-display: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  --pegasus-font-ui: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  --pegasus-font-display: var(--pegasus-font-ui);
   --pegasus-card-bg: linear-gradient(160deg, #fdfefe 0%, #f3f8ff 100%);
   --pegasus-card-border: #c5d5ef;
   --pegasus-soft-shadow: 0 8px 20px rgba(17, 43, 90, 0.08);

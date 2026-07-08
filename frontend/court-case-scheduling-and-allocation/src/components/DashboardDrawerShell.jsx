@@ -31,7 +31,7 @@ export default function DashboardDrawerShell({
   }, []);
 
   return (
-    <div style={{ fontFamily: "var(--pegasus-font-ui)", minHeight: '100vh', backgroundColor: theme.pageBg }}>
+    <div style={{ fontFamily: "var(--pegasus-font-ui)", minHeight: '100vh', backgroundColor: theme.pageBg, position: 'relative' }}>
       <Navbar />
 
       <nav
@@ -99,7 +99,7 @@ export default function DashboardDrawerShell({
             className="drawer-backdrop-enter"
             onClick={() => setIsSidebarOpen(false)}
             style={{
-              position: 'fixed',
+              position: 'absolute',
               top: `${DRAWER_TOP_OFFSET}px`,
               left: 0,
               right: 0,
@@ -111,7 +111,7 @@ export default function DashboardDrawerShell({
           <aside
             className="drawer-panel-enter"
             style={{
-              position: 'fixed',
+              position: 'absolute',
               top: `${DRAWER_TOP_OFFSET}px`,
               left: 0,
               bottom: 0,

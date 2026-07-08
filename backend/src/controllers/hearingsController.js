@@ -360,16 +360,19 @@ const setHearingModeByJudge = async (req, res) => {
 
     const updatedResult = await pool.query(
       `UPDATE hearings
-       SET hearing_mode = $1,
-           meeting_link = CASE WHEN $1 = 'virtual' THEN $2 ELSE NULL END,
+       SET hearing_mode = $1::varchar,
+           meeting_link = CASE WHEN $1::varchar = 'virtual' THEN NULLIF($2::text, '') ELSE NULL END,
            updated_at = NOW()
        WHERE hearing_id = $3
        RETURNING *`,
-      [hearingMode, meetingLink || null, parsedHearingId]
+      [hearingMode, meetingLink, parsedHearingId]
     );
 
     return res.status(200).json({ success: true, message: 'Hearing mode updated.', data: updatedResult.rows[0] });
   } catch (err) {
+    if (err && err.code === '22001') {
+      return res.status(400).json({ success: false, message: 'Meeting link is too long. Please use a shorter URL.' });
+    }
     console.error('setHearingModeByJudge error:', err);
     return res.status(500).json({ success: false, message: 'Server error.' });
   }
