@@ -300,7 +300,6 @@ export default function AdminJudgeDashboard() {
             <section className="pegasus-block" style={{ borderRadius: '12px', padding: '14px' }}>
               <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Priority Cases</h3>
               <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#64748B' }}>
-                Older open cases are ranked higher priority (first come, first served).
               </p>
               <div style={{ marginTop: '10px' }}>
                 {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading priority queue...</p>}
