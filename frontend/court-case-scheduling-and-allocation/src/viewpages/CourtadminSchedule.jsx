@@ -55,6 +55,7 @@ const fullDateKey = (dateValue) => {
 export default function CourtadminSchedule() {
   const [view, setView] = useState('requests');
   const [now, setNow] = useState(new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
   const [hearings, setHearings] = useState([]);
   const [judges, setJudges] = useState([]);
   const [selectedJudgeByHearing, setSelectedJudgeByHearing] = useState({});
@@ -413,6 +414,7 @@ export default function CourtadminSchedule() {
               return (
                 <div
                   key={cell.key}
+                  onClick={() => setSelectedCalendarDate(cell)}
                   style={{
                     minHeight: '68px',
                     border: isToday ? `2px solid ${ADMIN_THEME.accent}` : `1px solid ${ADMIN_THEME.border}`,
@@ -420,6 +422,7 @@ export default function CourtadminSchedule() {
                     padding: '4px',
                     backgroundColor: cell.inCurrentMonth ? '#fff' : '#F8FAFC',
                     opacity: cell.inCurrentMonth ? 1 : 0.7,
+                    cursor: 'pointer',
                   }}
                 >
                   <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: isToday ? ADMIN_THEME.accent : '#334155' }}>{cell.date.getDate()}</p>
@@ -516,6 +519,61 @@ export default function CourtadminSchedule() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedCalendarDate && (
+        <div
+          onClick={() => setSelectedCalendarDate(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 1300,
+            padding: '16px',
+          }}
+        >
+          <div
+            className="pegasus-block"
+            style={{ width: '100%', maxWidth: '760px', borderRadius: '12px', padding: '16px', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h3 style={{ margin: 0, color: '#1E2A45', fontSize: '18px' }}>
+                {selectedCalendarDate.date.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedCalendarDate(null)}
+                style={{ border: 'none', background: 'transparent', fontSize: '18px', color: '#334155', cursor: 'pointer' }}
+                aria-label="Close"
+              >
+                x
+              </button>
+            </div>
+
+            {selectedCalendarDate.hearings.length === 0 && (
+              <p style={{ margin: 0, color: '#64748B' }}>No hearings on this date.</p>
+            )}
+
+            {selectedCalendarDate.hearings.map((item) => (
+              <div key={`${selectedCalendarDate.key}-${item.hearingId}`} style={{ borderTop: '1px solid #E2E8F0', paddingTop: '10px', marginTop: '10px' }}>
+                <p style={{ margin: 0, color: ADMIN_THEME.accent, fontWeight: 700 }}>{item.id}</p>
+                <p style={{ margin: '4px 0 0', color: '#1E293B' }}>{item.title}</p>
+                <p style={{ margin: '4px 0 0', color: '#475569', fontSize: '13px' }}>Time: {item.time}</p>
+                <p style={{ margin: '4px 0 0', color: '#475569', fontSize: '13px' }}>Judge: {item.judge}{item.judgeSpecialty ? ` (${item.judgeSpecialty})` : ''}</p>
+                <p style={{ margin: '4px 0 0', color: statusColor(item.status), fontSize: '13px', fontWeight: 700 }}>Status: {item.status}</p>
+                <p style={{ margin: '4px 0 0', color: '#475569', fontSize: '13px', textTransform: 'capitalize' }}>
+                  Assignment response: {item.assignmentStatus || '-'}
+                </p>
+                {item.rejectionReason && (
+                  <p style={{ margin: '4px 0 0', color: '#B91C1C', fontSize: '13px' }}>Rejection reason: {item.rejectionReason}</p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </AdminPageShell>

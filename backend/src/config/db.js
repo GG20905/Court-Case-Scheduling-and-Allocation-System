@@ -106,6 +106,14 @@ const initializeDatabase = async () => {
       `);
       await client.query(`
         ALTER TABLE hearings
+        ADD COLUMN IF NOT EXISTS meeting_link TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE hearings
+        ALTER COLUMN meeting_link TYPE TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE hearings
         DROP CONSTRAINT IF EXISTS hearings_hearing_mode_check;
       `);
       await client.query(`
@@ -115,19 +123,44 @@ const initializeDatabase = async () => {
       `);
     }
 
+    const rulingsTableCheck = await client.query(`SELECT to_regclass('public.rulings') AS rulings_table`);
+    if (rulingsTableCheck.rows[0]?.rulings_table) {
+      await client.query(`
+        ALTER TABLE rulings
+        ALTER COLUMN ruling_text DROP NOT NULL;
+      `);
+      await client.query(`
+        ALTER TABLE rulings
+        ADD COLUMN IF NOT EXISTS ruling_document_name VARCHAR(255);
+      `);
+      await client.query(`
+        ALTER TABLE rulings
+        ADD COLUMN IF NOT EXISTS ruling_document_path VARCHAR(500);
+      `);
+      await client.query(`
+        ALTER TABLE rulings
+        DROP CONSTRAINT IF EXISTS rulings_ruling_content_check;
+      `);
+      await client.query(`
+        ALTER TABLE rulings
+        ADD CONSTRAINT rulings_ruling_content_check
+        CHECK (ruling_text IS NOT NULL OR ruling_document_path IS NOT NULL);
+      `);
+    }
+
     await ensureDocumentSharingSchema(client);
-    console.log('✅ Connected to PostgreSQL database');
+    console.log('Connected to PostgreSQL database');
   } catch (err) {
-    console.error('❌ Database connection error:', err.message);
-    console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
+    console.error('Database connection error:', err.message);
+    console.error('Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
   } finally {
     client.release();
   }
 };
 
 initializeDatabase().catch((err) => {
-  console.error('❌ Database initialization failed:', err.message);
-  console.error('⚠️ Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
+  console.error('Database initialization failed:', err.message);
+  console.error('Backend is still running, but database-dependent endpoints may fail until DB config is fixed.');
 });
 
 module.exports = pool;

@@ -25,6 +25,8 @@ export default function CourtadminDocuments() {
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [busyDocumentId, setBusyDocumentId] = useState(null);
+  const [rulings, setRulings] = useState([]);
+  const [isRulingsLoading, setIsRulingsLoading] = useState(true);
 
   const loadDocuments = async () => {
     setIsLoading(true);
@@ -55,10 +57,14 @@ export default function CourtadminDocuments() {
       );
 
       setDocuments(docsResults.flat());
+
+      const rulingsRes = await authFetchJson('/api/rulings');
+      setRulings(Array.isArray(rulingsRes.data) ? rulingsRes.data : []);
     } catch (error) {
       setFetchError(error.message || 'Failed to load documents.');
     } finally {
       setIsLoading(false);
+      setIsRulingsLoading(false);
     }
   };
 
@@ -76,6 +82,8 @@ export default function CourtadminDocuments() {
         doc.name.toLowerCase().includes(term);
 
       if (activeSidebar === 'all') return sameMonth && matchesSearch;
+      if (activeSidebar === 'ruling-docs') return sameMonth && matchesSearch && doc.type.toLowerCase() === 'ruling';
+      if (activeSidebar === 'rulings') return false;
       return sameMonth && matchesSearch && doc.type.toLowerCase() === activeSidebar;
     });
   }, [activeSidebar, documents, monthFilter, searchTerm]);
@@ -114,6 +122,27 @@ export default function CourtadminDocuments() {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleDownloadRulingDocument = async (rulingId, fallbackName) => {
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    const response = await fetch(`/api/rulings/${rulingId}/download`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) return;
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fallbackName || 'ruling.pdf';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleShareToDesignatedJudge = async (documentId) => {
     setActionError('');
     setActionMessage('');
@@ -141,7 +170,8 @@ export default function CourtadminDocuments() {
         { key: 'pleading', label: 'Pleadings' },
         { key: 'evidence', label: 'Evidence' },
         { key: 'affidavit', label: 'Affidavits' },
-        { key: 'ruling', label: 'Rulings' },
+        { key: 'ruling-docs', label: 'Ruling docs' },
+        { key: 'rulings', label: 'Rulings' },
       ]}
       activeSidebarKey={activeSidebar}
       onSidebarSelect={setActiveSidebar}
@@ -189,13 +219,13 @@ export default function CourtadminDocuments() {
         </div>
       )}
 
-      {!isLoading && docsByCase.length === 0 && (
+      {activeSidebar !== 'rulings' && !isLoading && docsByCase.length === 0 && (
         <div className="pegasus-block" style={{ borderRadius: '12px', padding: '20px' }}>
           <p style={{ margin: 0, color: '#64748B' }}>No documents found for this filter.</p>
         </div>
       )}
 
-      {!isLoading && docsByCase.map((group) => (
+      {activeSidebar !== 'rulings' && !isLoading && docsByCase.map((group) => (
         <div
           className="pegasus-block"
           key={group.caseId}
@@ -271,6 +301,63 @@ export default function CourtadminDocuments() {
           </table>
         </div>
       ))}
+
+      {activeSidebar === 'rulings' && (
+        <div className="pegasus-block" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="pegasus-table-head">
+                {['Case', 'Judge', 'Date', 'Status', 'Content'].map((h) => (
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', color: '#334155' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isRulingsLoading && (
+                <tr>
+                  <td colSpan={5} style={{ padding: '12px 14px', color: '#64748B' }}>Loading rulings...</td>
+                </tr>
+              )}
+              {!isRulingsLoading && rulings.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: '12px 14px', color: '#64748B' }}>No rulings found.</td>
+                </tr>
+              )}
+              {!isRulingsLoading && rulings.map((item) => (
+                <tr key={item.ruling_id} style={{ borderTop: '1px solid #E2E8F0' }}>
+                  <td style={{ padding: '10px 14px', color: '#1E293B', fontWeight: 600 }}>CASE-{item.case_id} - {item.case_title}</td>
+                  <td style={{ padding: '10px 14px', color: '#475569' }}>{item.judge_name || '-'}</td>
+                  <td style={{ padding: '10px 14px', color: '#475569' }}>{toDisplayDate(item.ruling_date)}</td>
+                  <td style={{ padding: '10px 14px', color: item.is_published ? '#166534' : '#92400E', fontWeight: 700 }}>
+                    {item.is_published ? 'Published' : 'Draft'}
+                  </td>
+                  <td style={{ padding: '10px 14px', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                    {item.ruling_document_path ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadRulingDocument(item.ruling_id, item.ruling_document_name)}
+                        style={{
+                          border: `1px solid ${ADMIN_THEME.border}`,
+                          backgroundColor: '#fff',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: '12px',
+                          color: ADMIN_THEME.accent,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Download {item.ruling_document_name || 'ruling'}
+                      </button>
+                    ) : (
+                      item.ruling_text
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </AdminPageShell>
   );
 }

@@ -299,40 +299,8 @@ export default function AdminJudgeDashboard() {
 
             <section className="pegasus-block" style={{ borderRadius: '12px', padding: '14px' }}>
               <h3 className="pegasus-section-title" style={{ margin: 0, fontSize: '16px', color: '#1E2A45' }}>Priority Cases</h3>
-              <div style={{ marginTop: '10px', marginBottom: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => setPrioritySortMode('priority')}
-                  style={{
-                    border: 'none',
-                    borderRadius: '999px',
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#fff',
-                    backgroundColor: prioritySortMode === 'priority' ? ADMIN_THEME.accent : '#94A3B8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Priority First
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPrioritySortMode('oldest')}
-                  style={{
-                    border: 'none',
-                    borderRadius: '999px',
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#fff',
-                    backgroundColor: prioritySortMode === 'oldest' ? ADMIN_THEME.accent : '#94A3B8',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Oldest First
-                </button>
-              </div>
+              <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#64748B' }}>
+              </p>
               <div style={{ marginTop: '10px' }}>
                 {isLoading && <p style={{ margin: 0, color: '#64748B' }}>Loading priority queue...</p>}
                 {!isLoading && priorityPanelCases.length === 0 && <p style={{ margin: 0, color: '#64748B' }}>No open cases in queue.</p>}

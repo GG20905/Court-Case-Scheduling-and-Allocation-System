@@ -39,6 +39,8 @@ router.get('/cases/categories', authenticate, casesController.getCaseCategories)
 router.get('/cases/:id', authenticate, casesController.getCaseById);
 router.patch('/cases/:id/status', authenticate, authorize('admin'), casesController.updateCaseStatus);
 router.patch('/cases/:id/register', authenticate, authorize('admin'), casesController.registerCase);
+router.delete('/cases/:id', authenticate, authorize('admin'), casesController.deleteCase);
+router.delete('/cases/:id/delete', authenticate, authorize('admin'), casesController.deleteCase); // compatibility alias
 
 // ─── HEARINGS ─────────────────────────────────────────────────
 router.post('/hearings/request', authenticate, authorize('litigant', 'advocate'), hearingsController.requestHearing);
@@ -60,9 +62,10 @@ router.get('/documents/:id/download', authenticate, documentsController.download
 router.delete('/documents/:id', authenticate, documentsController.deleteDocument);
 
 // ─── RULINGS ──────────────────────────────────────────────────
-router.post('/rulings', authenticate, authorize('judge'), rulingsController.submitRuling);
+router.post('/rulings', authenticate, authorize('judge'), upload.single('ruling_document'), rulingsController.submitRuling);
 router.get('/rulings', authenticate, rulingsController.getAllRulings);
 router.get('/rulings/case/:caseId', authenticate, rulingsController.getRulingByCase);
+router.get('/rulings/:id/download', authenticate, rulingsController.downloadRulingDocument);
 router.patch('/rulings/:id/publish', authenticate, authorize('admin'), rulingsController.publishRuling);
 
 module.exports = router;
